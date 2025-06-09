@@ -18,9 +18,10 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { addShiftRequest } from "@/lib/localStorage";
-import { DAYS_OF_WEEK, TIME_SLOTS, type ShiftRequest } from "@/types";
+import { addShiftRequest, getFormConfiguration } from "@/lib/localStorage";
+import { type ShiftRequest, type FormConfiguration } from "@/types";
 import { CalendarDays, Clock, Car, ClipboardList, Send } from "lucide-react";
+import { useEffect, useState } from "react";
 
 const availabilityFormSchema = z.object({
   days: z.array(z.string()).refine((value) => value.some((item) => item), {
@@ -29,7 +30,7 @@ const availabilityFormSchema = z.object({
   times: z.array(z.string()).refine((value) => value.some((item) => item), {
     message: "Debes seleccionar al menos un horario.",
   }),
-  hasCar: z.string({ required_error: "Por favor, indica si tienes auto." }), // Radio group returns string
+  hasCar: z.string({ required_error: "Por favor, indica si tienes auto." }),
   notes: z.string().max(500, "Las notas no pueden exceder los 500 caracteres.").optional(),
 });
 
@@ -37,6 +38,9 @@ type AvailabilityFormValues = z.infer<typeof availabilityFormSchema>;
 
 export default function AvailabilityForm() {
   const { toast } = useToast();
+  const [formConfig, setFormConfig] = useState<FormConfiguration | null>(null);
+  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
+
   const form = useForm<AvailabilityFormValues>({
     resolver: zodResolver(availabilityFormSchema),
     defaultValues: {
@@ -46,6 +50,12 @@ export default function AvailabilityForm() {
       notes: "",
     },
   });
+
+  useEffect(() => {
+    const config = getFormConfiguration();
+    setFormConfig(config);
+    setIsLoadingConfig(false);
+  }, []);
 
   function onSubmit(data: AvailabilityFormValues) {
     const requestData: Omit<ShiftRequest, 'id' | 'status' | 'submittedAt' | 'assignedRefereeName'> = {
@@ -62,6 +72,33 @@ export default function AvailabilityForm() {
     });
     form.reset();
   }
+
+  if (isLoadingConfig) {
+    return (
+      <div className="flex justify-center items-center h-64">
+        <p>Cargando formulario de disponibilidad...</p>
+      </div>
+    );
+  }
+
+  if (!formConfig || formConfig.availableDays.length === 0 || formConfig.availableTimeSlots.length === 0) {
+     return (
+      <Card className="w-full max-w-2xl mx-auto shadow-lg">
+        <CardHeader>
+           <CardTitle className="text-2xl font-headline flex items-center gap-2">
+            <ClipboardList className="text-primary" />
+            Registrar Disponibilidad
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-center text-muted-foreground">
+            El formulario de disponibilidad no está configurado actualmente o no hay opciones disponibles. Por favor, contacta al administrador.
+          </p>
+        </CardContent>
+      </Card>
+     );
+  }
+
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-lg">
@@ -85,44 +122,46 @@ export default function AvailabilityForm() {
                   <div className="mb-4">
                     <FormLabel className="text-base flex items-center gap-2"><CalendarDays className="text-primary"/>Días Disponibles</FormLabel>
                     <FormDescription>
-                      Selecciona los días de la semana en los que puedes arbitrar.
+                      Selecciona los días de la semana en los que puedes arbitrar (según configuración del admin).
                     </FormDescription>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                    {DAYS_OF_WEEK.map((day) => (
-                      <FormField
-                        key={day}
-                        control={form.control}
-                        name="days"
-                        render={({ field }) => {
-                          return (
-                            <FormItem
-                              key={day}
-                              className="flex flex-row items-start space-x-3 space-y-0"
-                            >
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value?.includes(day)}
-                                  onCheckedChange={(checked) => {
-                                    return checked
-                                      ? field.onChange([...(field.value || []), day])
-                                      : field.onChange(
-                                          (field.value || []).filter(
-                                            (value) => value !== day
-                                          )
-                                        );
-                                  }}
-                                />
-                              </FormControl>
-                              <FormLabel className="font-normal">
-                                {day}
-                              </FormLabel>
-                            </FormItem>
-                          );
-                        }}
-                      />
-                    ))}
-                  </div>
+                  {formConfig.availableDays.length > 0 ? (
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                      {formConfig.availableDays.map((day) => (
+                        <FormField
+                          key={`day-select-${day}`}
+                          control={form.control}
+                          name="days"
+                          render={({ field }) => {
+                            return (
+                              <FormItem
+                                key={day}
+                                className="flex flex-row items-start space-x-3 space-y-0"
+                              >
+                                <FormControl>
+                                  <Checkbox
+                                    checked={field.value?.includes(day)}
+                                    onCheckedChange={(checked) => {
+                                      return checked
+                                        ? field.onChange([...(field.value || []), day])
+                                        : field.onChange(
+                                            (field.value || []).filter(
+                                              (value) => value !== day
+                                            )
+                                          );
+                                    }}
+                                  />
+                                </FormControl>
+                                <FormLabel className="font-normal">
+                                  {day}
+                                </FormLabel>
+                              </FormItem>
+                            );
+                          }}
+                        />
+                      ))}
+                    </div>
+                  ) : <p className="text-sm text-muted-foreground">No hay días configurados por el administrador.</p>}
                   <FormMessage />
                 </FormItem>
               )}
@@ -136,44 +175,46 @@ export default function AvailabilityForm() {
                   <div className="mb-4">
                     <FormLabel className="text-base flex items-center gap-2"><Clock className="text-primary"/>Horarios Disponibles</FormLabel>
                     <FormDescription>
-                      Selecciona los bloques horarios en los que estás disponible.
+                      Selecciona los bloques horarios en los que estás disponible (según configuración del admin).
                     </FormDescription>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {TIME_SLOTS.map((time) => (
-                    <FormField
-                      key={time}
-                      control={form.control}
-                      name="times"
-                      render={({ field }) => {
-                        return (
-                          <FormItem
-                            key={time}
-                            className="flex flex-row items-start space-x-3 space-y-0"
-                          >
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value?.includes(time)}
-                                onCheckedChange={(checked) => {
-                                  return checked
-                                    ? field.onChange([...(field.value || []), time])
-                                    : field.onChange(
-                                        (field.value || []).filter(
-                                          (value) => value !== time
-                                        )
-                                      );
-                                }}
-                              />
-                            </FormControl>
-                            <FormLabel className="font-normal">
-                              {time}
-                            </FormLabel>
-                          </FormItem>
-                        );
-                      }}
-                    />
-                  ))}
-                  </div>
+                   {formConfig.availableTimeSlots.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {formConfig.availableTimeSlots.map((time) => (
+                      <FormField
+                        key={`time-select-${time}`}
+                        control={form.control}
+                        name="times"
+                        render={({ field }) => {
+                          return (
+                            <FormItem
+                              key={time}
+                              className="flex flex-row items-start space-x-3 space-y-0"
+                            >
+                              <FormControl>
+                                <Checkbox
+                                  checked={field.value?.includes(time)}
+                                  onCheckedChange={(checked) => {
+                                    return checked
+                                      ? field.onChange([...(field.value || []), time])
+                                      : field.onChange(
+                                          (field.value || []).filter(
+                                            (value) => value !== time
+                                          )
+                                        );
+                                  }}
+                                />
+                              </FormControl>
+                              <FormLabel className="font-normal">
+                                {time}
+                              </FormLabel>
+                            </FormItem>
+                          );
+                        }}
+                      />
+                    ))}
+                    </div>
+                     ) : <p className="text-sm text-muted-foreground">No hay horarios configurados por el administrador.</p>}
                   <FormMessage />
                 </FormItem>
               )}
@@ -230,7 +271,7 @@ export default function AvailabilityForm() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
+            <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={formConfig.availableDays.length === 0 || formConfig.availableTimeSlots.length === 0}>
               <Send className="mr-2 h-4 w-4" />
               Enviar Disponibilidad
             </Button>

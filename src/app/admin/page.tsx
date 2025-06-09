@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import ShiftTable from "@/components/admin/shift-table";
+import FormConfigEditor from "@/components/admin/form-config-editor";
 import { getShiftRequests, saveShiftRequests } from "@/lib/localStorage";
 import type { ShiftRequest } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { ClipboardList } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ClipboardList, Settings } from "lucide-react";
 
 export default function AdminPage() {
   const [requests, setRequests] = useState<ShiftRequest[]>([]);
@@ -27,7 +29,7 @@ export default function AdminPage() {
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
-        <p>Cargando turnos...</p>
+        <p>Cargando datos de administración...</p>
       </div>
     );
   }
@@ -38,14 +40,29 @@ export default function AdminPage() {
         <CardHeader>
           <CardTitle className="text-3xl font-headline flex items-center gap-2">
             <ClipboardList size={30} className="text-primary" />
-            Panel de Administración de Turnos
+            Panel de Administración
           </CardTitle>
           <CardDescription>
-            Visualiza y gestiona las solicitudes de disponibilidad y los turnos asignados a los árbitros.
+            Gestiona las solicitudes de disponibilidad, los turnos asignados y la configuración del formulario.
           </CardDescription>
         </CardHeader>
         <CardContent>
-           <ShiftTable requests={requests} onUpdateRequest={handleUpdateRequest} />
+          <Tabs defaultValue="shifts" className="w-full">
+            <TabsList className="grid w-full grid-cols-2 md:w-1/2 mb-6">
+              <TabsTrigger value="shifts">
+                <ClipboardList className="mr-2 h-4 w-4" /> Gestión de Turnos
+              </TabsTrigger>
+              <TabsTrigger value="form-config">
+                <Settings className="mr-2 h-4 w-4" /> Configurar Formulario
+              </TabsTrigger>
+            </TabsList>
+            <TabsContent value="shifts">
+              <ShiftTable requests={requests} onUpdateRequest={handleUpdateRequest} />
+            </TabsContent>
+            <TabsContent value="form-config">
+              <FormConfigEditor />
+            </TabsContent>
+          </Tabs>
         </CardContent>
       </Card>
     </div>

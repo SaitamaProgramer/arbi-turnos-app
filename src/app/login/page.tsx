@@ -1,0 +1,128 @@
+"use client";
+
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { useToast } from "@/hooks/use-toast";
+import { LogIn, UserPlus } from "lucide-react";
+// import { findUserByEmail } from "@/lib/localStorage"; // Placeholder for auth
+// import { useRouter } from "next/navigation"; // Placeholder for navigation
+
+const loginFormSchema = z.object({
+  email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),
+  password: z.string().min(1, { message: "La contraseña no puede estar vacía." }),
+});
+
+type LoginFormValues = z.infer<typeof loginFormSchema>;
+
+export default function LoginPage() {
+  const { toast } = useToast();
+  // const router = useRouter(); // Placeholder for navigation
+
+  const form = useForm<LoginFormValues>({
+    resolver: zodResolver(loginFormSchema),
+    defaultValues: {
+      email: "",
+      password: "",
+    },
+  });
+
+  function onSubmit(data: LoginFormValues) {
+    // Basic login simulation
+    // In a real app, you would call an auth service here
+    console.log("Login data:", data);
+    // const user = findUserByEmail(data.email);
+    // if (user && user.password === data.password) { // VERY INSECURE: for demo only
+    //   toast({
+    //     title: "Inicio de Sesión Exitoso",
+    //     description: `Bienvenido, ${user.name}!`,
+    //   });
+    //   if (user.role === 'admin') {
+    //     router.push('/admin');
+    //   } else {
+    //     router.push('/');
+    //   }
+    // } else {
+    //   toast({
+    //     title: "Error de Inicio de Sesión",
+    //     description: "Correo electrónico o contraseña incorrectos.",
+    //     variant: "destructive",
+    //   });
+    // }
+    toast({
+      title: "Intento de Inicio de Sesión",
+      description: "Funcionalidad de inicio de sesión en desarrollo.",
+    });
+    form.reset();
+  }
+
+  return (
+    <div className="flex flex-col items-center justify-center py-12">
+      <Card className="w-full max-w-md mx-auto shadow-xl">
+        <CardHeader>
+          <CardTitle className="text-3xl font-headline flex items-center gap-2">
+            <LogIn className="text-primary" />
+            Iniciar Sesión
+          </CardTitle>
+          <CardDescription>
+            Accede a tu cuenta para gestionar turnos o registrar tu disponibilidad.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Correo Electrónico</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="tu@email.com" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Contraseña</FormLabel>
+                    <FormControl>
+                      <Input type="password" placeholder="••••••••" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
+                <LogIn className="mr-2 h-4 w-4" />
+                Acceder
+              </Button>
+            </form>
+          </Form>
+          <p className="mt-6 text-center text-sm text-muted-foreground">
+            ¿No tienes una cuenta?{" "}
+            <Link href="/register" className="font-medium text-primary hover:underline">
+              Regístrate aquí
+            </Link>
+          </p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
