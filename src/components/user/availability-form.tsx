@@ -20,8 +20,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { addShiftRequest, getFormConfiguration, getCurrentUserEmail, findUserByEmail } from "@/lib/localStorage";
-import type { ShiftRequest, FormConfiguration, User } from "@/types";
-import { CalendarDays, Clock, Car, ClipboardList, Send, Loader2 } from "lucide-react";
+import type { FormConfiguration, User } from "@/types";
+import { CalendarDays, Clock, Car, ClipboardList, Send, Loader2, AlertTriangle } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
@@ -42,36 +42,35 @@ export default function AvailabilityForm() {
   const { toast } = useToast();
   const router = useRouter();
   const [formConfig, setFormConfig] = useState<FormConfiguration | null>(null);
-  const [isLoadingConfig, setIsLoadingConfig] = useState(true);
-  const [currentUserEmail, setCurrentUserEmailState] = useState<string | null>(null);
-  const [authLoading, setAuthLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(true);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
 
   useEffect(() => {
     const userEmail = getCurrentUserEmail();
     if (!userEmail) {
       router.push('/login');
-    } else {
-      setCurrentUserEmailState(userEmail);
-      // Check if user is 'referee' role. Admins shouldn't typically fill this.
-      // For simplicity, we'll allow any logged-in user for now.
-      // A more robust check might involve fetching user details and role.
-      // const userDetails = findUserByEmail(userEmail);
-      // if (userDetails && userDetails.role === 'admin') {
-      //   toast({ title: "Acceso no permitido", description: "Los administradores no envían disponibilidad.", variant: "destructive" });
-      //   router.push('/admin');
-      //   return;
-      // }
-      setAuthLoading(false);
+      return;
     }
-  }, [router, toast]);
+    const userDetails = findUserByEmail(userEmail);
+    if (!userDetails || !userDetails.clubId) {
+        toast({ title: "Error de Configuración", description: "Tu cuenta no está asociada a un club. Contacta al administrador.", variant: "destructive"});
+        // Potentially logout or redirect to a specific page
+        router.push('/login'); 
+        return;
+    }
+    setCurrentUser(userDetails);
 
-  useEffect(() => {
-    if (!authLoading && currentUserEmail) {
-      const config = getFormConfiguration();
-      setFormConfig(config);
-      setIsLoadingConfig(false);
+    if (userDetails.role === 'admin') {
+      toast({ title: "Acceso no Permitido", description: "Los administradores gestionan turnos, no envían disponibilidad. Serás redirigido.", variant: "destructive" });
+      router.push('/admin');
+      return;
     }
-  }, [authLoading, currentUserEmail]);
+
+    const config = getFormConfiguration(userDetails.clubId);
+    setFormConfig(config);
+    setIsLoading(false);
+  }, [router, toast]);
 
   const form = useForm<AvailabilityFormValues>({
     resolver: zodResolver(availabilityFormSchema),
@@ -84,27 +83,30 @@ export default function AvailabilityForm() {
   });
 
   function onSubmit(data: AvailabilityFormValues) {
-    if (!currentUserEmail) {
-      toast({ title: "Error", description: "Debes iniciar sesión para enviar tu disponibilidad.", variant: "destructive" });
+    if (!currentUser || !currentUser.email || !currentUser.clubId) {
+      toast({ title: "Error", description: "No se pudo identificar al usuario o su club. Por favor, inicia sesión de nuevo.", variant: "destructive" });
       router.push('/login');
       return;
     }
-    const requestDataOmitUser = {
-      days: data.days,
-      times: data.times,
-      hasCar: data.hasCar === "true",
-      notes: data.notes || "",
-    };
-    addShiftRequest(requestDataOmitUser, currentUserEmail);
+    addShiftRequest(
+      {
+        days: data.days,
+        times: data.times,
+        hasCar: data.hasCar === "true",
+        notes: data.notes || "",
+      },
+      currentUser.email,
+      currentUser.clubId
+    );
     toast({
       title: "Disponibilidad Enviada",
-      description: "Tu disponibilidad ha sido registrada con éxito.",
+      description: "Tu disponibilidad ha sido registrada con éxito para tu club.",
       variant: "default",
     });
     form.reset();
   }
 
-  if (authLoading || isLoadingConfig) {
+  if (isLoading) {
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -113,8 +115,7 @@ export default function AvailabilityForm() {
     );
   }
   
-  if (!currentUserEmail) {
-    // This case should ideally be handled by the redirect, but as a fallback:
+  if (!currentUser) {
     return (
         <div className="flex justify-center items-center h-64">
             <p>Redirigiendo a inicio de sesión...</p>
@@ -131,9 +132,14 @@ export default function AvailabilityForm() {
             Registrar Disponibilidad
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-center text-muted-foreground">
-            El formulario de disponibilidad no está configurado actualmente o no hay opciones disponibles. Por favor, contacta al administrador.
+        <CardContent className="text-center py-10">
+          <AlertTriangle className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
+          <p className="text-xl font-semibold text-muted-foreground mb-2">Formulario No Configurado</p>
+          <p className="text-sm text-muted-foreground">
+            El administrador de tu club aún no ha configurado los días y horarios disponibles para el envío de disponibilidad.
+          </p>
+          <p className="text-sm text-muted-foreground mt-1">
+            Por favor, contacta al administrador de tu club.
           </p>
         </CardContent>
       </Card>
@@ -148,7 +154,7 @@ export default function AvailabilityForm() {
           Registrar Disponibilidad
         </CardTitle>
         <CardDescription>
-          Completa el formulario para indicar tus días y horarios disponibles, si cuentas con auto y cualquier aclaración adicional.
+          Completa el formulario para indicar tus días y horarios disponibles para el club al que perteneces.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -162,7 +168,7 @@ export default function AvailabilityForm() {
                   <div className="mb-4">
                     <FormLabel className="text-base flex items-center gap-2"><CalendarDays className="text-primary"/>Días Disponibles</FormLabel>
                     <FormDescription>
-                      Selecciona los días de la semana en los que puedes arbitrar (según configuración del admin).
+                      Selecciona los días de la semana en los que puedes arbitrar (según configuración de tu club).
                     </FormDescription>
                   </div>
                   {formConfig.availableDays.length > 0 ? (
@@ -201,7 +207,7 @@ export default function AvailabilityForm() {
                         />
                       ))}
                     </div>
-                  ) : <p className="text-sm text-muted-foreground">No hay días configurados por el administrador.</p>}
+                  ) : <p className="text-sm text-muted-foreground">No hay días configurados por el administrador de tu club.</p>}
                   <FormMessage />
                 </FormItem>
               )}
@@ -215,7 +221,7 @@ export default function AvailabilityForm() {
                   <div className="mb-4">
                     <FormLabel className="text-base flex items-center gap-2"><Clock className="text-primary"/>Horarios Disponibles</FormLabel>
                     <FormDescription>
-                      Selecciona los bloques horarios en los que estás disponible (según configuración del admin).
+                      Selecciona los bloques horarios en los que estás disponible (según configuración de tu club).
                     </FormDescription>
                   </div>
                    {formConfig.availableTimeSlots.length > 0 ? (
@@ -254,7 +260,7 @@ export default function AvailabilityForm() {
                       />
                     ))}
                     </div>
-                     ) : <p className="text-sm text-muted-foreground">No hay horarios configurados por el administrador.</p>}
+                     ) : <p className="text-sm text-muted-foreground">No hay horarios configurados por el administrador de tu club.</p>}
                   <FormMessage />
                 </FormItem>
               )}
@@ -305,13 +311,13 @@ export default function AvailabilityForm() {
                     />
                   </FormControl>
                   <FormDescription>
-                    Cualquier información relevante que el administrador deba conocer.
+                    Cualquier información relevante que el administrador de tu club deba conocer.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={!currentUserEmail || formConfig.availableDays.length === 0 || formConfig.availableTimeSlots.length === 0}>
+            <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={!currentUser || formConfig.availableDays.length === 0 || formConfig.availableTimeSlots.length === 0}>
               <Send className="mr-2 h-4 w-4" />
               Enviar Disponibilidad
             </Button>

@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getFormConfiguration, saveFormConfiguration } from "@/lib/localStorage";
 import { DAYS_OF_WEEK, TIME_SLOTS, type FormConfiguration } from "@/types";
 import { useEffect, useState } from "react";
-import { Save, Settings2, CalendarDays, Clock } from "lucide-react";
+import { Save, Settings2, CalendarDays, Clock, Loader2 } from "lucide-react";
 
 const formConfigSchema = z.object({
   configuredDays: z.array(z.string()).refine((value) => value.some((item) => item), {
@@ -32,7 +33,11 @@ const formConfigSchema = z.object({
 
 type FormConfigValues = z.infer<typeof formConfigSchema>;
 
-export default function FormConfigEditor() {
+interface FormConfigEditorProps {
+  clubId: string;
+}
+
+export default function FormConfigEditor({ clubId }: FormConfigEditorProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   
@@ -45,28 +50,39 @@ export default function FormConfigEditor() {
   });
 
   useEffect(() => {
-    const currentConfig = getFormConfiguration();
-    form.reset({
-      configuredDays: currentConfig.availableDays,
-      configuredTimeSlots: currentConfig.availableTimeSlots,
-    });
-    setIsLoading(false);
-  }, [form]);
+    if (clubId) {
+      const currentConfig = getFormConfiguration(clubId);
+      form.reset({
+        configuredDays: currentConfig.availableDays,
+        configuredTimeSlots: currentConfig.availableTimeSlots,
+      });
+      setIsLoading(false);
+    }
+  }, [form, clubId]);
 
   function onSubmit(data: FormConfigValues) {
+    if (!clubId) {
+      toast({ title: "Error", description: "No se pudo identificar el club.", variant: "destructive" });
+      return;
+    }
     const newConfig: FormConfiguration = {
       availableDays: data.configuredDays,
       availableTimeSlots: data.configuredTimeSlots,
     };
-    saveFormConfiguration(newConfig);
+    saveFormConfiguration(clubId, newConfig);
     toast({
       title: "Configuración Guardada",
-      description: "Los días y horarios disponibles para el formulario han sido actualizados.",
+      description: "Los días y horarios disponibles para el formulario de tu club han sido actualizados.",
     });
   }
 
   if (isLoading) {
-    return <p>Cargando configuración del formulario...</p>;
+    return (
+      <div className="flex items-center justify-center py-8">
+        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+        Cargando configuración del formulario...
+      </div>
+    );
   }
 
   return (
@@ -74,10 +90,10 @@ export default function FormConfigEditor() {
       <CardHeader>
         <CardTitle className="text-2xl font-headline flex items-center gap-2">
           <Settings2 size={28} className="text-primary" />
-          Configurar Formulario de Disponibilidad
+          Configurar Formulario de Disponibilidad del Club
         </CardTitle>
         <CardDescription>
-          Selecciona los días y horarios que los árbitros podrán elegir al enviar su disponibilidad.
+          Selecciona los días y horarios que los árbitros de tu club podrán elegir al enviar su disponibilidad.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -91,7 +107,7 @@ export default function FormConfigEditor() {
                   <div className="mb-4">
                     <FormLabel className="text-lg font-semibold flex items-center gap-2"><CalendarDays className="text-primary"/>Días Habilitados</FormLabel>
                     <FormDescription>
-                      Marca los días de la semana que estarán disponibles en el formulario.
+                      Marca los días de la semana que estarán disponibles en el formulario para tu club.
                     </FormDescription>
                   </div>
                   <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -142,7 +158,7 @@ export default function FormConfigEditor() {
                   <div className="mb-4">
                     <FormLabel className="text-lg font-semibold flex items-center gap-2"><Clock className="text-primary"/>Horarios Habilitados</FormLabel>
                     <FormDescription>
-                      Marca los bloques horarios que estarán disponibles en el formulario.
+                      Marca los bloques horarios que estarán disponibles en el formulario para tu club.
                     </FormDescription>
                   </div>
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -186,7 +202,7 @@ export default function FormConfigEditor() {
             />
             <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
               <Save className="mr-2 h-4 w-4" />
-              Guardar Configuración
+              Guardar Configuración del Club
             </Button>
           </form>
         </Form>

@@ -15,20 +15,44 @@ import {
   FormMessage,
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus } from "lucide-react";
+import { UserPlus, ShieldCheck, Briefcase } from "lucide-react";
 import { addUser, setCurrentUserEmail } from "@/lib/localStorage";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 
-const registerFormSchema = z.object({
+const registerFormSchemaBase = z.object({
   name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
   email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),
   password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
   confirmPassword: z.string(),
+  role: z.enum(["admin", "referee"], { required_error: "Debes seleccionar un rol." }),
+});
+
+const registerFormSchema = registerFormSchemaBase.extend({
+  clubName: z.string().optional(),
+  clubIdToJoin: z.string().optional(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Las contraseñas no coinciden.",
   path: ["confirmPassword"],
+}).refine((data) => {
+  if (data.role === "admin") {
+    return !!data.clubName && data.clubName.length >= 3;
+  }
+  return true;
+}, {
+  message: "El nombre del club debe tener al menos 3 caracteres para administradores.",
+  path: ["clubName"],
+}).refine((data) => {
+  if (data.role === "referee") {
+    return !!data.clubIdToJoin && data.clubIdToJoin.length > 0;
+  }
+  return true;
+}, {
+  message: "El código de club es requerido para árbitros.",
+  path: ["clubIdToJoin"],
 });
 
 type RegisterFormValues = z.infer<typeof registerFormSchema>;
@@ -36,6 +60,7 @@ type RegisterFormValues = z.infer<typeof registerFormSchema>;
 export default function RegisterPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const [selectedRole, setSelectedRole] = useState<'admin' | 'referee' | undefined>(undefined);
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerFormSchema),
@@ -44,46 +69,128 @@ export default function RegisterPage() {
       email: "",
       password: "",
       confirmPassword: "",
+      role: undefined,
+      clubName: "",
+      clubIdToJoin: "",
     },
   });
 
   function onSubmit(data: RegisterFormValues) {
-    const result = addUser({ name: data.name, email: data.email, password: data.password, role: 'referee' });
+    const result = addUser({
+      name: data.name,
+      email: data.email,
+      password: data.password,
+      role: data.role,
+      clubName: data.role === 'admin' ? data.clubName : undefined,
+      clubIdToJoin: data.role === 'referee' ? data.clubIdToJoin : undefined,
+    });
     
-    if ('error' in result) {
+    if (result.error) {
       toast({
         title: "Error de Registro",
         description: result.error,
         variant: "destructive",
       });
-    } else {
-      setCurrentUserEmail(result.email); // Set current user on successful registration
+    } else if (result.user) {
+      setCurrentUserEmail(result.user.email);
       toast({
         title: "Registro Exitoso",
-        description: "Tu cuenta ha sido creada. Serás redirigido.",
+        description: `Tu cuenta como ${data.role === 'admin' ? `administrador del club ${result.club?.name}` : 'árbitro'} ha sido creada. ${data.role === 'admin' ? `El código de tu club es: ${result.club?.id}` : ''} Serás redirigido.`,
+        duration: data.role === 'admin' ? 10000 : 5000, // Longer duration for admin to see club ID
       });
-      router.push('/'); // Redirect to user dashboard or main page
+      if (result.user.role === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/');
+      }
     }
-    // Do not reset form if there's an error, so user can correct it.
-    // Reset only on success or if explicitly desired.
-    // form.reset(); 
   }
 
   return (
     <div className="flex flex-col items-center justify-center py-12">
-      <Card className="w-full max-w-md mx-auto shadow-xl">
+      <Card className="w-full max-w-lg mx-auto shadow-xl">
         <CardHeader>
           <CardTitle className="text-3xl font-headline flex items-center gap-2">
             <UserPlus className="text-primary" />
             Crear Cuenta
           </CardTitle>
           <CardDescription>
-            Regístrate para poder enviar tu disponibilidad como árbitro.
+            Regístrate como administrador de club o como árbitro para unirte a un club existente.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+              <FormField
+                control={form.control}
+                name="role"
+                render={({ field }) => (
+                  <FormItem className="space-y-3">
+                    <FormLabel>Quiero registrarme como:</FormLabel>
+                    <FormControl>
+                      <RadioGroup
+                        onValueChange={(value: 'admin' | 'referee') => {
+                          field.onChange(value);
+                          setSelectedRole(value);
+                          form.setValue("clubName", "");
+                          form.setValue("clubIdToJoin", "");
+                          form.clearErrors("clubName");
+                          form.clearErrors("clubIdToJoin");
+                        }}
+                        defaultValue={field.value}
+                        className="flex flex-col space-y-2 sm:flex-row sm:space-x-4 sm:space-y-0"
+                      >
+                        <FormItem className="flex items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="admin" />
+                          </FormControl>
+                          <FormLabel className="font-normal flex items-center gap-1"><ShieldCheck size={18}/> Administrador de Club</FormLabel>
+                        </FormItem>
+                        <FormItem className="flex items-center space-x-3 space-y-0">
+                          <FormControl>
+                            <RadioGroupItem value="referee" />
+                          </FormControl>
+                          <FormLabel className="font-normal flex items-center gap-1"><Briefcase size={18}/> Árbitro</FormLabel>
+                        </FormItem>
+                      </RadioGroup>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {selectedRole === "admin" && (
+                <FormField
+                  control={form.control}
+                  name="clubName"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Nombre del Club a Crear</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ej: Liga Barrial Sol Naciente" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+
+              {selectedRole === "referee" && (
+                <FormField
+                  control={form.control}
+                  name="clubIdToJoin"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Código de Club para Unirse</FormLabel>
+                      <FormControl>
+                        <Input placeholder="Ingresa el código proporcionado por el administrador" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              
               <FormField
                 control={form.control}
                 name="name"
@@ -136,7 +243,7 @@ export default function RegisterPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={!selectedRole}>
                 <UserPlus className="mr-2 h-4 w-4" />
                 Registrarse
               </Button>

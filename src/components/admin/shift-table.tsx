@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
+import { updateShiftRequestStatus } from "@/lib/localStorage"; // Import the specific update function
 import { Car, CalendarDays, Clock, FileText, UserCheck, CheckCircle2, UserPlus, BadgeCheck, ParkingCircleOff, Hourglass, Mail } from "lucide-react";
 import { useState, useEffect } from "react";
 import { format } from 'date-fns';
@@ -33,19 +34,23 @@ import { es } from 'date-fns/locale';
 
 interface ShiftTableProps {
   requests: ShiftRequest[];
-  onUpdateRequest: (updatedRequest: ShiftRequest) => void;
+  onUpdateRequest: (updatedRequest: ShiftRequest) => void; // This prop might be simplified if direct updates are sufficient
+  clubId: string; // To ensure actions are context-aware if needed, though localStorage handles global list.
 }
 
-export default function ShiftTable({ requests, onUpdateRequest }: ShiftTableProps) {
+export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftTableProps) {
   const { toast } = useToast();
   const [assigningRequestId, setAssigningRequestId] = useState<string | null>(null);
   const [refereeName, setRefereeName] = useState("");
   const [sortedRequests, setSortedRequests] = useState<ShiftRequest[]>([]);
 
   useEffect(() => {
-    const sorted = [...requests].sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+    // Filter requests by clubId before sorting, although parent component AdminPage should already provide filtered requests.
+    // This is a safeguard or if ShiftTable were to be used more generically.
+    const clubRequests = requests.filter(req => req.clubId === clubId);
+    const sorted = [...clubRequests].sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
     setSortedRequests(sorted);
-  }, [requests]);
+  }, [requests, clubId]);
 
   const handleAssignShift = () => {
     if (!assigningRequestId || !refereeName.trim()) {
@@ -56,35 +61,32 @@ export default function ShiftTable({ requests, onUpdateRequest }: ShiftTableProp
       });
       return;
     }
-    const requestToUpdate = requests.find(req => req.id === assigningRequestId);
-    if (requestToUpdate) {
-      const updatedRequest: ShiftRequest = {
-        ...requestToUpdate,
-        status: "assigned",
-        assignedRefereeName: refereeName.trim(),
-      };
-      onUpdateRequest(updatedRequest);
+    
+    const updatedRequest = updateShiftRequestStatus(assigningRequestId, "assigned", refereeName.trim());
+
+    if (updatedRequest) {
+      onUpdateRequest(updatedRequest); // Notify parent for UI update
       toast({
         title: "Turno Asignado",
         description: `El turno ha sido asignado a ${refereeName.trim()}.`,
       });
+    } else {
+      toast({ title: "Error", description: "No se pudo actualizar la solicitud.", variant: "destructive" });
     }
     setAssigningRequestId(null);
     setRefereeName("");
   };
 
   const handleMarkAsCompleted = (id: string) => {
-    const requestToUpdate = requests.find(req => req.id === id);
-    if (requestToUpdate) {
-      const updatedRequest: ShiftRequest = {
-        ...requestToUpdate,
-        status: "completed",
-      };
-      onUpdateRequest(updatedRequest);
+    const updatedRequest = updateShiftRequestStatus(id, "completed");
+    if (updatedRequest) {
+      onUpdateRequest(updatedRequest); // Notify parent for UI update
       toast({
         title: "Turno Completado",
         description: "El turno ha sido marcado como completado.",
       });
+    } else {
+      toast({ title: "Error", description: "No se pudo actualizar la solicitud.", variant: "destructive" });
     }
   };
 
@@ -102,13 +104,13 @@ export default function ShiftTable({ requests, onUpdateRequest }: ShiftTableProp
   };
   
   if (sortedRequests.length === 0) {
-    return <p className="text-center text-muted-foreground mt-8">No hay solicitudes de turno disponibles.</p>;
+    return <p className="text-center text-muted-foreground mt-8">No hay solicitudes de turno disponibles para tu club.</p>;
   }
 
   return (
     <div className="rounded-lg border shadow-sm overflow-hidden bg-card">
       <Table>
-        <TableCaption>Lista de solicitudes y turnos de árbitros. Mostrando {sortedRequests.length} registros.</TableCaption>
+        <TableCaption>Lista de solicitudes y turnos de árbitros para tu club. Mostrando {sortedRequests.length} registros.</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead className="font-headline"><Mail className="inline mr-1 h-4 w-4 text-primary" />Email Solicitante</TableHead>

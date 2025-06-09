@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LogIn } from "lucide-react";
 import { findUserByEmail, setCurrentUserEmail } from "@/lib/localStorage";
 import { useRouter } from "next/navigation";
-import type { User } from "@/types";
+// Removed unused User type import: import type { User } from "@/types";
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),
@@ -44,8 +44,7 @@ export default function LoginPage() {
   function onSubmit(data: LoginFormValues) {
     const user = findUserByEmail(data.email);
 
-    // VERY INSECURE: for demo only, comparing plaintext passwords
-    if (user && user.password === data.password) {
+    if (user && user.password === data.password) { // VERY INSECURE: for demo only
       setCurrentUserEmail(user.email);
       toast({
         title: "Inicio de Sesión Exitoso",
@@ -63,8 +62,6 @@ export default function LoginPage() {
         variant: "destructive",
       });
     }
-    // Do not reset form on failed login attempts to allow user to correct mistakes
-    // form.reset(); 
   }
 
   return (
