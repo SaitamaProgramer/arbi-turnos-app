@@ -2,13 +2,13 @@
 export interface ShiftRequest {
   id: string;
   userEmail: string;
-  clubId: string; // Nuevo: A qué club pertenece esta solicitud
+  clubId: string; 
   days: string[];
   times: string[];
   hasCar: boolean;
   notes: string;
   status: 'pending' | 'assigned' | 'completed';
-  submittedAt: string; // ISO date string
+  submittedAt: string; 
   assignedRefereeName?: string;
 }
 
@@ -20,11 +20,10 @@ export interface FormConfiguration {
   availableTimeSlots: string[];
 }
 
-// Nuevo: Representa un Club o Grupo de Árbitros
 export interface Club {
-  id: string; // Código del Club, usado por árbitros para unirse
+  id: string; 
   name: string;
-  adminUserId: string; // ID del usuario administrador de este club
+  adminUserId: string; 
 }
 
 export interface User {
@@ -32,6 +31,9 @@ export interface User {
   name: string;
   email: string;
   role: 'admin' | 'referee';
-  clubId: string | null; // Nuevo: ID del club al que pertenece el usuario (null si aún no está asociado o es un superadmin)
-  password?: string; // Password should be hashed in a real app
+  // Si es admin, este es el ID del club que administra
+  administeredClubId?: string; 
+  // Si es árbitro, estos son los IDs de los clubes a los que pertenece
+  memberClubIds?: string[]; 
+  password?: string; 
 }

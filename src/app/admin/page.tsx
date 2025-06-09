@@ -4,11 +4,20 @@
 import { useEffect, useState } from "react";
 import ShiftTable from "@/components/admin/shift-table";
 import FormConfigEditor from "@/components/admin/form-config-editor";
-import { getShiftRequests, saveShiftRequests, getCurrentUserEmail, findUserByEmail, findClubById } from "@/lib/localStorage";
+import AdminDashboard from "@/components/admin/admin-dashboard"; // Nuevo componente para dashboard
+import { 
+  getShiftRequests, 
+  getCurrentUserEmail, 
+  findUserByEmail, 
+  findClubById,
+  getRefereesByClubId,
+  getActiveClubId, // Importar para verificar si el admin es árbitro en otro club
+  setActiveClubId // Potencialmente para limpiar si un admin intenta actuar como árbitro
+} from "@/lib/localStorage";
 import type { ShiftRequest, User, Club } from "@/types";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClipboardList, Settings, Loader2, ShieldAlert, Info, Copy } from "lucide-react";
+import { ClipboardList, Settings, Loader2, ShieldAlert, Info, Copy, LayoutDashboard } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -18,6 +27,7 @@ export default function AdminPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentClub, setCurrentClub] = useState<Club | null>(null);
+  const [refereesInClub, setRefereesInClub] = useState<User[]>([]);
   const router = useRouter();
   const { toast } = useToast();
 
@@ -28,24 +38,43 @@ export default function AdminPage() {
       return;
     }
     const user = findUserByEmail(userEmail);
-    if (user && user.role === 'admin' && user.clubId) {
-      setCurrentUser(user);
-      const club = findClubById(user.clubId);
+     setCurrentUser(user); // Set current user early for conditional rendering
+
+    if (user && user.role === 'admin' && user.administeredClubId) {
+      const adminClubId = user.administeredClubId;
+      // Ensure admin is not trying to use an "active referee club" context here
+      // This logic might be refined based on whether an admin can also be a referee for other clubs
+      const activeRefereeClub = getActiveClubId();
+      if (activeRefereeClub && activeRefereeClub !== adminClubId) {
+          setActiveClubId(adminClubId); // Force admin's club context
+      }
+
+      const club = findClubById(adminClubId);
       if (club) {
         setCurrentClub(club);
         setRequests(getShiftRequests(club.id));
+        setRefereesInClub(getRefereesByClubId(club.id));
       } else {
-         toast({ title: "Error de Club", description: "No se pudo encontrar el club asociado a tu cuenta.", variant: "destructive" });
-         router.push('/login'); // Or a generic error page
+         toast({ title: "Error de Club", description: "No se pudo encontrar el club que administras.", variant: "destructive" });
+         router.push('/login'); 
          return;
       }
-    } else {
-      toast({
+    } else if (user && user.role === 'referee') {
+       toast({
         title: "Acceso Denegado",
-        description: "No tienes permisos de administrador para un club o no estás asociado a uno.",
+        description: "Esta página es solo para administradores.",
         variant: "destructive"
       });
-      router.push(user && user.role === 'referee' ? '/' : '/login');
+      router.push('/');
+      return;
+    }
+     else { // Not admin or admin without club
+      toast({
+        title: "Acceso Denegado",
+        description: "No tienes permisos de administrador o no estás asociado a un club.",
+        variant: "destructive"
+      });
+      router.push('/login');
       return;
     }
     setIsLoading(false);
@@ -53,16 +82,11 @@ export default function AdminPage() {
 
   const handleUpdateRequest = (updatedRequest: ShiftRequest) => {
     if (!currentClub) return;
-    // The saveShiftRequests function in localStorage handles global list,
-    // so we just need to re-fetch for the current club to update the local state.
-    // To make it reactive immediately without full re-fetch complexity for this demo:
     const updatedRequests = requests.map(req => 
       req.id === updatedRequest.id ? updatedRequest : req
     );
     setRequests(updatedRequests);
-    // The actual saving is done by updateShiftRequestStatus in localStorage
-    // This ensures the global list is updated.
-    // No need to call saveShiftRequests directly from here if it's already handled.
+    // Actual saving is handled by updateShiftRequestStatus
   };
 
   const copyClubId = () => {
@@ -77,7 +101,7 @@ export default function AdminPage() {
     }
   };
 
-  if (isLoading) {
+  if (isLoading || !currentUser) { // Added !currentUser to condition
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -86,7 +110,18 @@ export default function AdminPage() {
     );
   }
 
-  if (!currentUser || !currentClub) {
+  if (!currentClub && currentUser?.role === 'admin') { // If admin but club couldn't be found
+     return (
+      <div className="flex flex-col items-center justify-center h-64 text-center">
+        <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
+        <p className="text-xl font-semibold">Error al cargar el club.</p>
+        <p className="text-muted-foreground">No se pudo encontrar el club que administras. Serás redirigido...</p>
+      </div>
+    );
+  }
+  
+  // This case should ideally be caught by the useEffect redirect logic
+  if (currentUser.role !== 'admin' || !currentClub) {
      return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
         <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
@@ -96,12 +131,12 @@ export default function AdminPage() {
     );
   }
 
+
   return (
     <div className="w-full space-y-6">
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="text-3xl font-headline flex items-center gap-2">
-            <ClipboardList size={30} className="text-primary" />
             Panel de Admin: {currentClub.name}
           </CardTitle>
           <CardDescription>
@@ -109,8 +144,11 @@ export default function AdminPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="shifts" className="w-full">
-            <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-3 mb-6">
+          <Tabs defaultValue="dashboard" className="w-full">
+            <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-4 mb-6">
+               <TabsTrigger value="dashboard">
+                <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
+              </TabsTrigger>
               <TabsTrigger value="shifts">
                 <ClipboardList className="mr-2 h-4 w-4" /> Gestión de Turnos
               </TabsTrigger>
@@ -121,6 +159,13 @@ export default function AdminPage() {
                 <Info className="mr-2 h-4 w-4" /> Info del Club
               </TabsTrigger>
             </TabsList>
+             <TabsContent value="dashboard">
+              <AdminDashboard 
+                clubId={currentClub.id} 
+                allRefereesInClub={refereesInClub}
+                shiftRequestsForClub={requests}
+              />
+            </TabsContent>
             <TabsContent value="shifts">
               <ShiftTable requests={requests} onUpdateRequest={handleUpdateRequest} clubId={currentClub.id} />
             </TabsContent>

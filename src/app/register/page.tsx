@@ -19,7 +19,7 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { UserPlus, ShieldCheck, Briefcase } from "lucide-react";
-import { addUser, setCurrentUserEmail } from "@/lib/localStorage";
+import { addUser, setCurrentUserEmail, setActiveClubId, findUserByEmail } from "@/lib/localStorage";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 
@@ -93,11 +93,19 @@ export default function RegisterPage() {
       });
     } else if (result.user) {
       setCurrentUserEmail(result.user.email);
+      // For newly registered users, set their active club context
+      if (result.user.role === 'admin' && result.user.administeredClubId) {
+        setActiveClubId(result.user.administeredClubId);
+      } else if (result.user.role === 'referee' && result.user.memberClubIds && result.user.memberClubIds.length > 0) {
+        setActiveClubId(result.user.memberClubIds[0]); // Default to first club
+      }
+      
       toast({
         title: "Registro Exitoso",
         description: `Tu cuenta como ${data.role === 'admin' ? `administrador del club ${result.club?.name}` : 'árbitro'} ha sido creada. ${data.role === 'admin' ? `El código de tu club es: ${result.club?.id}` : ''} Serás redirigido.`,
-        duration: data.role === 'admin' ? 10000 : 5000, // Longer duration for admin to see club ID
+        duration: data.role === 'admin' ? 10000 : 5000,
       });
+      
       if (result.user.role === 'admin') {
         router.push('/admin');
       } else {

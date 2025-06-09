@@ -2,18 +2,18 @@
 import type { ShiftRequest, FormConfiguration, User, Club } from '@/types';
 import { DAYS_OF_WEEK, TIME_SLOTS } from '@/types';
 
-const SHIFT_REQUESTS_KEY = 'arbitros_shift_requests_v3'; // Incremented version
-const FORM_CONFIGURATIONS_KEY = 'arbitros_form_configurations_v2'; // Pluralized and versioned
-const USERS_KEY = 'arbitros_users_v2'; // Incremented version
-const CLUBS_KEY = 'arbitros_clubs_v1'; // New key for clubs
-const CURRENT_USER_EMAIL_KEY = 'arbitros_current_user_email_v2'; // Incremented version
+const SHIFT_REQUESTS_KEY = 'arbitros_shift_requests_v3';
+const FORM_CONFIGURATIONS_KEY = 'arbitros_form_configurations_v2';
+const USERS_KEY = 'arbitros_users_v3'; // Incremented version for new User structure
+const CLUBS_KEY = 'arbitros_clubs_v1';
+const CURRENT_USER_EMAIL_KEY = 'arbitros_current_user_email_v2';
+const ACTIVE_CLUB_ID_KEY = 'arbitros_active_club_id_v1'; // New key for active club selection
 
 export const DEFAULT_FORM_CONFIGURATION: FormConfiguration = {
   availableDays: [...DAYS_OF_WEEK],
   availableTimeSlots: [...TIME_SLOTS],
 };
 
-// Helper para obtener datos de localStorage
 function getItem<T>(key: string, defaultValue: T): T {
   if (typeof window === 'undefined') {
     return defaultValue;
@@ -27,7 +27,6 @@ function getItem<T>(key: string, defaultValue: T): T {
   }
 }
 
-// Helper para guardar datos en localStorage
 function setItem<T>(key: string, value: T): void {
   if (typeof window === 'undefined') {
     return;
@@ -39,13 +38,25 @@ function setItem<T>(key: string, value: T): void {
   }
 }
 
-// Current User (Session Simulation)
+// Current User Session
 export const setCurrentUserEmail = (email: string | null): void => {
   setItem(CURRENT_USER_EMAIL_KEY, email);
+  if (!email) { // Clear active club if logging out
+    setActiveClubId(null);
+  }
 };
 
 export const getCurrentUserEmail = (): string | null => {
   return getItem(CURRENT_USER_EMAIL_KEY, null);
+};
+
+// Active Club for Referees
+export const setActiveClubId = (clubId: string | null): void => {
+  setItem(ACTIVE_CLUB_ID_KEY, clubId);
+};
+
+export const getActiveClubId = (): string | null => {
+  return getItem(ACTIVE_CLUB_ID_KEY, null);
 };
 
 // Clubs
@@ -60,7 +71,7 @@ export const saveClubs = (clubs: Club[]): void => {
 export const addClub = (name: string, adminUserId: string): Club => {
   const clubs = getClubs();
   const newClub: Club = {
-    id: crypto.randomUUID().slice(0, 8), // Shorter, more user-friendly ID
+    id: crypto.randomUUID().slice(0, 8),
     name,
     adminUserId,
   };
@@ -72,6 +83,12 @@ export const findClubById = (clubId: string): Club | undefined => {
   return getClubs().find(club => club.id === clubId);
 };
 
+export const getClubNameById = (clubId: string): string | undefined => {
+  const club = findClubById(clubId);
+  return club?.name;
+};
+
+
 // User Management
 export const getUsers = (): User[] => {
   return getItem(USERS_KEY, []);
@@ -82,7 +99,7 @@ export const saveUsers = (users: User[]): void => {
 };
 
 export const addUser = (
-  userData: Omit<User, 'id' | 'clubId'> & { role: 'admin' | 'referee'; clubName?: string; clubIdToJoin?: string }
+  userData: Omit<User, 'id' | 'administeredClubId' | 'memberClubIds'> & { role: 'admin' | 'referee'; clubName?: string; clubIdToJoin?: string }
 ): { user?: User; club?: Club; error?: string } => {
   const users = getUsers();
   if (users.find(user => user.email === userData.email)) {
@@ -102,9 +119,9 @@ export const addUser = (
       id: userId,
       name: userData.name,
       email: userData.email,
-      password: userData.password,
+      password: userData.password, // Not hashed - demo only
       role: 'admin',
-      clubId: newClub.id,
+      administeredClubId: newClub.id,
     };
   } else { // referee
     if (!userData.clubIdToJoin) {
@@ -118,9 +135,9 @@ export const addUser = (
       id: userId,
       name: userData.name,
       email: userData.email,
-      password: userData.password,
+      password: userData.password, // Not hashed - demo only
       role: 'referee',
-      clubId: userData.clubIdToJoin,
+      memberClubIds: [userData.clubIdToJoin],
     };
   }
 
@@ -131,6 +148,11 @@ export const addUser = (
 export const findUserByEmail = (email: string): User | undefined => {
   return getUsers().find(user => user.email === email);
 };
+
+export const getRefereesByClubId = (clubId: string): User[] => {
+  const allUsers = getUsers();
+  return allUsers.filter(user => user.role === 'referee' && user.memberClubIds?.includes(clubId));
+}
 
 // Shift Requests
 export const getShiftRequests = (clubId?: string): ShiftRequest[] => {
@@ -150,7 +172,6 @@ export const addShiftRequest = (
   userEmail: string,
   clubId: string
 ): ShiftRequest => {
-  const requests = getShiftRequests(); // Get all requests to append globally
   const newRequest: ShiftRequest = {
     ...requestData,
     id: crypto.randomUUID(),
@@ -184,7 +205,7 @@ export const updateShiftRequestStatus = (id: string, status: ShiftRequest['statu
   return updatedRequest;
 };
 
-// Form Configuration (now per club)
+// Form Configuration
 export const getFormConfigurations = (): Record<string, FormConfiguration> => {
   return getItem(FORM_CONFIGURATIONS_KEY, {});
 };

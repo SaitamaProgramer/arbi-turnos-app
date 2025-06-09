@@ -18,9 +18,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { LogIn } from "lucide-react";
-import { findUserByEmail, setCurrentUserEmail } from "@/lib/localStorage";
+import { findUserByEmail, setCurrentUserEmail, setActiveClubId } from "@/lib/localStorage";
 import { useRouter } from "next/navigation";
-// Removed unused User type import: import type { User } from "@/types";
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),
@@ -46,15 +45,40 @@ export default function LoginPage() {
 
     if (user && user.password === data.password) { // VERY INSECURE: for demo only
       setCurrentUserEmail(user.email);
+      
+      if (user.role === 'admin' && user.administeredClubId) {
+        setActiveClubId(user.administeredClubId); // Admin operates on their administered club
+        router.push('/admin');
+      } else if (user.role === 'referee' && user.memberClubIds && user.memberClubIds.length > 0) {
+        // For referees, default to the first club in their list.
+        // A dedicated club selection UI would be better for multiple clubs.
+        setActiveClubId(user.memberClubIds[0]); 
+        router.push('/');
+      } else if (user.role === 'referee' && (!user.memberClubIds || user.memberClubIds.length === 0)) {
+         toast({
+            title: "Error de Configuración",
+            description: "Este árbitro no está asociado a ningún club.",
+            variant: "destructive",
+          });
+         setCurrentUserEmail(null); // Log out user
+         return;
+      }
+       else {
+        // Fallback or error if user role/club setup is unexpected
+        toast({
+          title: "Error de Configuración",
+          description: "No se pudo determinar tu rol o club. Contacta al soporte.",
+          variant: "destructive",
+        });
+        setCurrentUserEmail(null); // Log out user
+        return;
+      }
+      
       toast({
         title: "Inicio de Sesión Exitoso",
         description: `Bienvenido de nuevo, ${user.name}!`,
       });
-      if (user.role === 'admin') {
-        router.push('/admin');
-      } else {
-        router.push('/');
-      }
+
     } else {
       toast({
         title: "Error de Inicio de Sesión",

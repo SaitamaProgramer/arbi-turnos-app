@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { updateShiftRequestStatus } from "@/lib/localStorage"; // Import the specific update function
+import { updateShiftRequestStatus } from "@/lib/localStorage"; 
 import { Car, CalendarDays, Clock, FileText, UserCheck, CheckCircle2, UserPlus, BadgeCheck, ParkingCircleOff, Hourglass, Mail } from "lucide-react";
 import { useState, useEffect } from "react";
 import { format } from 'date-fns';
@@ -34,22 +34,22 @@ import { es } from 'date-fns/locale';
 
 interface ShiftTableProps {
   requests: ShiftRequest[];
-  onUpdateRequest: (updatedRequest: ShiftRequest) => void; // This prop might be simplified if direct updates are sufficient
-  clubId: string; // To ensure actions are context-aware if needed, though localStorage handles global list.
+  onUpdateRequest: (updatedRequest: ShiftRequest) => void; 
+  clubId: string; 
 }
 
 export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftTableProps) {
   const { toast } = useToast();
   const [assigningRequestId, setAssigningRequestId] = useState<string | null>(null);
   const [refereeName, setRefereeName] = useState("");
-  const [sortedRequests, setSortedRequests] = useState<ShiftRequest[]>([]);
+  const [displayRequests, setDisplayRequests] = useState<ShiftRequest[]>([]);
 
   useEffect(() => {
-    // Filter requests by clubId before sorting, although parent component AdminPage should already provide filtered requests.
-    // This is a safeguard or if ShiftTable were to be used more generically.
+    // Filter requests by clubId and then sort.
+    // The parent AdminPage should already provide filtered requests, but this is defensive.
     const clubRequests = requests.filter(req => req.clubId === clubId);
     const sorted = [...clubRequests].sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
-    setSortedRequests(sorted);
+    setDisplayRequests(sorted);
   }, [requests, clubId]);
 
   const handleAssignShift = () => {
@@ -65,7 +65,7 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
     const updatedRequest = updateShiftRequestStatus(assigningRequestId, "assigned", refereeName.trim());
 
     if (updatedRequest) {
-      onUpdateRequest(updatedRequest); // Notify parent for UI update
+      onUpdateRequest(updatedRequest); 
       toast({
         title: "Turno Asignado",
         description: `El turno ha sido asignado a ${refereeName.trim()}.`,
@@ -80,7 +80,7 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
   const handleMarkAsCompleted = (id: string) => {
     const updatedRequest = updateShiftRequestStatus(id, "completed");
     if (updatedRequest) {
-      onUpdateRequest(updatedRequest); // Notify parent for UI update
+      onUpdateRequest(updatedRequest); 
       toast({
         title: "Turno Completado",
         description: "El turno ha sido marcado como completado.",
@@ -103,14 +103,14 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
     }
   };
   
-  if (sortedRequests.length === 0) {
+  if (displayRequests.length === 0) {
     return <p className="text-center text-muted-foreground mt-8">No hay solicitudes de turno disponibles para tu club.</p>;
   }
 
   return (
     <div className="rounded-lg border shadow-sm overflow-hidden bg-card">
       <Table>
-        <TableCaption>Lista de solicitudes y turnos de árbitros para tu club. Mostrando {sortedRequests.length} registros.</TableCaption>
+        <TableCaption>Lista de solicitudes y turnos de árbitros para tu club. Mostrando {displayRequests.length} registros.</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead className="font-headline"><Mail className="inline mr-1 h-4 w-4 text-primary" />Email Solicitante</TableHead>
@@ -125,7 +125,7 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
           </TableRow>
         </TableHeader>
         <TableBody>
-          {sortedRequests.map((request) => (
+          {displayRequests.map((request) => (
             <TableRow key={request.id}>
               <TableCell className="text-xs">{request.userEmail}</TableCell>
               <TableCell className="max-w-[150px] break-words">{request.days.join(", ")}</TableCell>
