@@ -1,14 +1,36 @@
+
 import type { ShiftRequest, FormConfiguration, User } from '@/types';
 import { DAYS_OF_WEEK, TIME_SLOTS } from '@/types';
 
 const SHIFT_REQUESTS_KEY = 'arbitros_shift_requests_v2';
 const FORM_CONFIGURATION_KEY = 'arbitros_form_configuration_v1';
-const USERS_KEY = 'arbitros_users_v1'; // For storing registered users
+const USERS_KEY = 'arbitros_users_v1';
+const CURRENT_USER_EMAIL_KEY = 'arbitros_current_user_email_v1';
 
 export const DEFAULT_FORM_CONFIGURATION: FormConfiguration = {
   availableDays: [...DAYS_OF_WEEK],
   availableTimeSlots: [...TIME_SLOTS],
 };
+
+// Current User (Session Simulation)
+export const setCurrentUserEmail = (email: string | null): void => {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  if (email) {
+    localStorage.setItem(CURRENT_USER_EMAIL_KEY, email);
+  } else {
+    localStorage.removeItem(CURRENT_USER_EMAIL_KEY);
+  }
+};
+
+export const getCurrentUserEmail = (): string | null => {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  return localStorage.getItem(CURRENT_USER_EMAIL_KEY);
+};
+
 
 // Shift Requests
 export const getShiftRequests = (): ShiftRequest[] => {
@@ -35,11 +57,15 @@ export const saveShiftRequests = (requests: ShiftRequest[]): void => {
   }
 };
 
-export const addShiftRequest = (requestData: Omit<ShiftRequest, 'id' | 'status' | 'submittedAt' | 'assignedRefereeName'>): ShiftRequest => {
+export const addShiftRequest = (
+  requestData: Omit<ShiftRequest, 'id' | 'status' | 'submittedAt' | 'assignedRefereeName' | 'userEmail'>,
+  userEmail: string
+): ShiftRequest => {
   const requests = getShiftRequests();
   const newRequest: ShiftRequest = {
     ...requestData,
     id: crypto.randomUUID(),
+    userEmail,
     status: 'pending',
     submittedAt: new Date().toISOString(),
   };
@@ -76,7 +102,6 @@ export const getFormConfiguration = (): FormConfiguration => {
     const data = localStorage.getItem(FORM_CONFIGURATION_KEY);
     if (data) {
       const parsed = JSON.parse(data);
-      // Ensure both arrays exist, otherwise return default
       if (parsed.availableDays && parsed.availableTimeSlots) {
         return parsed;
       }
@@ -124,14 +149,17 @@ export const saveUsers = (users: User[]): void => {
   }
 };
 
-export const addUser = (userData: Omit<User, 'id'>): User | { error: string } => {
+export const addUser = (userData: Omit<User, 'id' | 'role'> & {role?: 'admin' | 'referee'}): User | { error: string } => {
   const users = getUsers();
   if (users.find(user => user.email === userData.email)) {
     return { error: "El correo electrónico ya está registrado." };
   }
   const newUser: User = {
-    ...userData,
     id: crypto.randomUUID(),
+    name: userData.name,
+    email: userData.email,
+    password: userData.password, // Store password directly for demo; BAD for production
+    role: userData.role || 'referee', // Default to referee
   };
   saveUsers([...users, newUser]);
   return newUser;

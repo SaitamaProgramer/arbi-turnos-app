@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ShiftRequest } from "@/types";
@@ -25,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { Car, CalendarDays, Clock, FileText, UserCheck, CheckCircle2, MoreHorizontal, UserPlus, BadgeCheck, ParkingCircleOff, Hourglass } from "lucide-react";
+import { Car, CalendarDays, Clock, FileText, UserCheck, CheckCircle2, UserPlus, BadgeCheck, ParkingCircleOff, Hourglass, Mail } from "lucide-react";
 import { useState, useEffect } from "react";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -110,6 +111,7 @@ export default function ShiftTable({ requests, onUpdateRequest }: ShiftTableProp
         <TableCaption>Lista de solicitudes y turnos de árbitros. Mostrando {sortedRequests.length} registros.</TableCaption>
         <TableHeader>
           <TableRow>
+            <TableHead className="font-headline"><Mail className="inline mr-1 h-4 w-4 text-primary" />Email Solicitante</TableHead>
             <TableHead className="font-headline"><CalendarDays className="inline mr-1 h-4 w-4 text-primary" />Días</TableHead>
             <TableHead className="font-headline"><Clock className="inline mr-1 h-4 w-4 text-primary" />Horarios</TableHead>
             <TableHead className="font-headline"><Car className="inline mr-1 h-4 w-4 text-primary" />Auto</TableHead>
@@ -123,6 +125,7 @@ export default function ShiftTable({ requests, onUpdateRequest }: ShiftTableProp
         <TableBody>
           {sortedRequests.map((request) => (
             <TableRow key={request.id}>
+              <TableCell className="text-xs">{request.userEmail}</TableCell>
               <TableCell className="max-w-[150px] break-words">{request.days.join(", ")}</TableCell>
               <TableCell className="max-w-[200px] break-words">{request.times.join(", ")}</TableCell>
               <TableCell>
@@ -134,8 +137,8 @@ export default function ShiftTable({ requests, onUpdateRequest }: ShiftTableProp
               <TableCell>{request.assignedRefereeName || "-"}</TableCell>
               <TableCell className="text-right">
                 {request.status === "pending" && (
-                  <AlertDialogTrigger asChild onSelect={() => setAssigningRequestId(request.id)}>
-                    <Button variant="outline" size="sm" className="border-primary text-primary hover:bg-primary/10">
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm" className="border-primary text-primary hover:bg-primary/10" onClick={() => setAssigningRequestId(request.id)}>
                       <UserPlus className="mr-2 h-4 w-4" /> Asignar
                     </Button>
                   </AlertDialogTrigger>

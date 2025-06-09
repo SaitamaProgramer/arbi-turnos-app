@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,9 +17,9 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { UserPlus, LogIn } from "lucide-react";
-// import { addUser } from "@/lib/localStorage"; // Placeholder for user creation
-// import { useRouter } from "next/navigation"; // Placeholder for navigation
+import { UserPlus } from "lucide-react";
+import { addUser, setCurrentUserEmail } from "@/lib/localStorage";
+import { useRouter } from "next/navigation";
 
 const registerFormSchema = z.object({
   name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
@@ -27,14 +28,14 @@ const registerFormSchema = z.object({
   confirmPassword: z.string(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Las contraseñas no coinciden.",
-  path: ["confirmPassword"], // path of error
+  path: ["confirmPassword"],
 });
 
 type RegisterFormValues = z.infer<typeof registerFormSchema>;
 
 export default function RegisterPage() {
   const { toast } = useToast();
-  // const router = useRouter(); // Placeholder for navigation
+  const router = useRouter();
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerFormSchema),
@@ -47,28 +48,25 @@ export default function RegisterPage() {
   });
 
   function onSubmit(data: RegisterFormValues) {
-    // Basic registration simulation
-    // In a real app, you would call an auth service here
-    console.log("Register data:", data);
-    // const result = addUser({ name: data.name, email: data.email, password: data.password, role: 'referee' });
-    // if ('error' in result) {
-    //   toast({
-    //     title: "Error de Registro",
-    //     description: result.error,
-    //     variant: "destructive",
-    //   });
-    // } else {
-    //   toast({
-    //     title: "Registro Exitoso",
-    //     description: "Tu cuenta ha sido creada. Por favor, inicia sesión.",
-    //   });
-    //   router.push('/login');
-    // }
-    toast({
-      title: "Intento de Registro",
-      description: "Funcionalidad de registro en desarrollo.",
-    });
-    form.reset();
+    const result = addUser({ name: data.name, email: data.email, password: data.password, role: 'referee' });
+    
+    if ('error' in result) {
+      toast({
+        title: "Error de Registro",
+        description: result.error,
+        variant: "destructive",
+      });
+    } else {
+      setCurrentUserEmail(result.email); // Set current user on successful registration
+      toast({
+        title: "Registro Exitoso",
+        description: "Tu cuenta ha sido creada. Serás redirigido.",
+      });
+      router.push('/'); // Redirect to user dashboard or main page
+    }
+    // Do not reset form if there's an error, so user can correct it.
+    // Reset only on success or if explicitly desired.
+    // form.reset(); 
   }
 
   return (

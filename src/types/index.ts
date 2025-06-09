@@ -1,5 +1,7 @@
+
 export interface ShiftRequest {
   id: string;
+  userEmail: string; // Added to track who submitted the request
   days: string[];
   times: string[];
   hasCar: boolean;
@@ -23,5 +25,5 @@ export interface User {
   name: string;
   email: string;
   role: 'admin' | 'referee';
-  // In a real app, password would be a hash, not stored directly
+  password?: string; // Password should be hashed in a real app
 }

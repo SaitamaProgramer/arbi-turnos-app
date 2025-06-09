@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -18,10 +19,11 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { addShiftRequest, getFormConfiguration } from "@/lib/localStorage";
-import { type ShiftRequest, type FormConfiguration } from "@/types";
-import { CalendarDays, Clock, Car, ClipboardList, Send } from "lucide-react";
+import { addShiftRequest, getFormConfiguration, getCurrentUserEmail, findUserByEmail } from "@/lib/localStorage";
+import type { ShiftRequest, FormConfiguration, User } from "@/types";
+import { CalendarDays, Clock, Car, ClipboardList, Send, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
 const availabilityFormSchema = z.object({
   days: z.array(z.string()).refine((value) => value.some((item) => item), {
@@ -38,8 +40,38 @@ type AvailabilityFormValues = z.infer<typeof availabilityFormSchema>;
 
 export default function AvailabilityForm() {
   const { toast } = useToast();
+  const router = useRouter();
   const [formConfig, setFormConfig] = useState<FormConfiguration | null>(null);
   const [isLoadingConfig, setIsLoadingConfig] = useState(true);
+  const [currentUserEmail, setCurrentUserEmailState] = useState<string | null>(null);
+  const [authLoading, setAuthLoading] = useState(true);
+
+  useEffect(() => {
+    const userEmail = getCurrentUserEmail();
+    if (!userEmail) {
+      router.push('/login');
+    } else {
+      setCurrentUserEmailState(userEmail);
+      // Check if user is 'referee' role. Admins shouldn't typically fill this.
+      // For simplicity, we'll allow any logged-in user for now.
+      // A more robust check might involve fetching user details and role.
+      // const userDetails = findUserByEmail(userEmail);
+      // if (userDetails && userDetails.role === 'admin') {
+      //   toast({ title: "Acceso no permitido", description: "Los administradores no envían disponibilidad.", variant: "destructive" });
+      //   router.push('/admin');
+      //   return;
+      // }
+      setAuthLoading(false);
+    }
+  }, [router, toast]);
+
+  useEffect(() => {
+    if (!authLoading && currentUserEmail) {
+      const config = getFormConfiguration();
+      setFormConfig(config);
+      setIsLoadingConfig(false);
+    }
+  }, [authLoading, currentUserEmail]);
 
   const form = useForm<AvailabilityFormValues>({
     resolver: zodResolver(availabilityFormSchema),
@@ -51,20 +83,19 @@ export default function AvailabilityForm() {
     },
   });
 
-  useEffect(() => {
-    const config = getFormConfiguration();
-    setFormConfig(config);
-    setIsLoadingConfig(false);
-  }, []);
-
   function onSubmit(data: AvailabilityFormValues) {
-    const requestData: Omit<ShiftRequest, 'id' | 'status' | 'submittedAt' | 'assignedRefereeName'> = {
+    if (!currentUserEmail) {
+      toast({ title: "Error", description: "Debes iniciar sesión para enviar tu disponibilidad.", variant: "destructive" });
+      router.push('/login');
+      return;
+    }
+    const requestDataOmitUser = {
       days: data.days,
       times: data.times,
       hasCar: data.hasCar === "true",
       notes: data.notes || "",
     };
-    addShiftRequest(requestData);
+    addShiftRequest(requestDataOmitUser, currentUserEmail);
     toast({
       title: "Disponibilidad Enviada",
       description: "Tu disponibilidad ha sido registrada con éxito.",
@@ -73,11 +104,21 @@ export default function AvailabilityForm() {
     form.reset();
   }
 
-  if (isLoadingConfig) {
+  if (authLoading || isLoadingConfig) {
     return (
       <div className="flex justify-center items-center h-64">
-        <p>Cargando formulario de disponibilidad...</p>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2">Cargando datos...</p>
       </div>
+    );
+  }
+  
+  if (!currentUserEmail) {
+    // This case should ideally be handled by the redirect, but as a fallback:
+    return (
+        <div className="flex justify-center items-center h-64">
+            <p>Redirigiendo a inicio de sesión...</p>
+        </div>
     );
   }
 
@@ -98,7 +139,6 @@ export default function AvailabilityForm() {
       </Card>
      );
   }
-
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-lg">
@@ -271,7 +311,7 @@ export default function AvailabilityForm() {
                 </FormItem>
               )}
             />
-            <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={formConfig.availableDays.length === 0 || formConfig.availableTimeSlots.length === 0}>
+            <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={!currentUserEmail || formConfig.availableDays.length === 0 || formConfig.availableTimeSlots.length === 0}>
               <Send className="mr-2 h-4 w-4" />
               Enviar Disponibilidad
             </Button>

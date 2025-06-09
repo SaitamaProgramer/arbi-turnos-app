@@ -1,10 +1,27 @@
+
+"use client";
+
 import Link from 'next/link';
-import { UsersRound, LogIn, UserPlus } from 'lucide-react'; // Icon for referees or sports related theme
+import { UsersRound, LogIn, UserPlus, LogOut } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { getCurrentUserEmail, setCurrentUserEmail } from '@/lib/localStorage';
+import { useRouter, usePathname } from 'next/navigation';
+import { Button } from '@/components/ui/button';
 
 export default function Navbar() {
-  // Placeholder for authentication state
-  const isAuthenticated = false; 
-  const isAdmin = false;
+  const [currentUser, setCurrentUser] = useState<string | null>(null);
+  const router = useRouter();
+  const pathname = usePathname(); // To re-check auth state on route change
+
+  useEffect(() => {
+    setCurrentUser(getCurrentUserEmail());
+  }, [pathname]); // Re-run effect when path changes
+
+  const handleLogout = () => {
+    setCurrentUserEmail(null);
+    setCurrentUser(null);
+    router.push('/login');
+  };
 
   return (
     <header className="bg-card shadow-md sticky top-0 z-50">
@@ -17,15 +34,19 @@ export default function Navbar() {
           <Link href="/" className="text-foreground hover:text-primary transition-colors font-medium text-sm sm:text-base">
             Disponibilidad
           </Link>
-          {/* Show Admin link if authenticated as admin - simplified for now */}
-          {/* {isAuthenticated && isAdmin && ( */}
-            <Link href="/admin" className="text-foreground hover:text-primary transition-colors font-medium text-sm sm:text-base">
-              Administración
-            </Link>
-          {/* )} */}
+          <Link href="/admin" className="text-foreground hover:text-primary transition-colors font-medium text-sm sm:text-base">
+            Administración
+          </Link>
           
-          {/* Basic auth links - will be improved with actual auth state */}
-          {!isAuthenticated && (
+          {currentUser ? (
+            <>
+              <span className="text-sm text-muted-foreground hidden sm:inline">Hola, {currentUser.split('@')[0]}</span>
+              <Button variant="ghost" size="sm" onClick={handleLogout} className="text-foreground hover:text-primary">
+                <LogOut size={18} className="mr-1 sm:mr-2" />
+                Salir
+              </Button>
+            </>
+          ) : (
             <>
               <Link href="/login" className="text-foreground hover:text-primary transition-colors font-medium text-sm sm:text-base inline-flex items-center">
                 <LogIn size={18} className="mr-1 sm:mr-2" />
@@ -37,12 +58,6 @@ export default function Navbar() {
               </Link>
             </>
           )}
-          {/* {isAuthenticated && (
-             <Button variant="ghost" size="sm" onClick={() => console.log('logout')}>
-               <LogOut size={18} className="mr-2" />
-               Salir
-             </Button>
-          )} */}
         </div>
       </nav>
     </header>

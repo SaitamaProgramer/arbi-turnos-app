@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -16,9 +17,10 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { LogIn, UserPlus } from "lucide-react";
-// import { findUserByEmail } from "@/lib/localStorage"; // Placeholder for auth
-// import { useRouter } from "next/navigation"; // Placeholder for navigation
+import { LogIn } from "lucide-react";
+import { findUserByEmail, setCurrentUserEmail } from "@/lib/localStorage";
+import { useRouter } from "next/navigation";
+import type { User } from "@/types";
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),
@@ -29,7 +31,7 @@ type LoginFormValues = z.infer<typeof loginFormSchema>;
 
 export default function LoginPage() {
   const { toast } = useToast();
-  // const router = useRouter(); // Placeholder for navigation
+  const router = useRouter();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -40,32 +42,29 @@ export default function LoginPage() {
   });
 
   function onSubmit(data: LoginFormValues) {
-    // Basic login simulation
-    // In a real app, you would call an auth service here
-    console.log("Login data:", data);
-    // const user = findUserByEmail(data.email);
-    // if (user && user.password === data.password) { // VERY INSECURE: for demo only
-    //   toast({
-    //     title: "Inicio de Sesión Exitoso",
-    //     description: `Bienvenido, ${user.name}!`,
-    //   });
-    //   if (user.role === 'admin') {
-    //     router.push('/admin');
-    //   } else {
-    //     router.push('/');
-    //   }
-    // } else {
-    //   toast({
-    //     title: "Error de Inicio de Sesión",
-    //     description: "Correo electrónico o contraseña incorrectos.",
-    //     variant: "destructive",
-    //   });
-    // }
-    toast({
-      title: "Intento de Inicio de Sesión",
-      description: "Funcionalidad de inicio de sesión en desarrollo.",
-    });
-    form.reset();
+    const user = findUserByEmail(data.email);
+
+    // VERY INSECURE: for demo only, comparing plaintext passwords
+    if (user && user.password === data.password) {
+      setCurrentUserEmail(user.email);
+      toast({
+        title: "Inicio de Sesión Exitoso",
+        description: `Bienvenido de nuevo, ${user.name}!`,
+      });
+      if (user.role === 'admin') {
+        router.push('/admin');
+      } else {
+        router.push('/');
+      }
+    } else {
+      toast({
+        title: "Error de Inicio de Sesión",
+        description: "Correo electrónico o contraseña incorrectos.",
+        variant: "destructive",
+      });
+    }
+    // Do not reset form on failed login attempts to allow user to correct mistakes
+    // form.reset(); 
   }
 
   return (

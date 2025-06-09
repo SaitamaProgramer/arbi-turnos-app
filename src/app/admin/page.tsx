@@ -1,22 +1,52 @@
+
 "use client";
 
 import { useEffect, useState } from "react";
 import ShiftTable from "@/components/admin/shift-table";
 import FormConfigEditor from "@/components/admin/form-config-editor";
-import { getShiftRequests, saveShiftRequests } from "@/lib/localStorage";
-import type { ShiftRequest } from "@/types";
+import { getShiftRequests, saveShiftRequests, getCurrentUserEmail, findUserByEmail } from "@/lib/localStorage";
+import type { ShiftRequest, User } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClipboardList, Settings } from "lucide-react";
+import { ClipboardList, Settings, Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AdminPage() {
   const [requests, setRequests] = useState<ShiftRequest[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
+  const router = useRouter();
+  const { toast } = useToast();
 
   useEffect(() => {
-    setRequests(getShiftRequests());
-    setIsLoading(false);
-  }, []);
+    const userEmail = getCurrentUserEmail();
+    if (!userEmail) {
+      router.push('/login');
+      return;
+    }
+    const user = findUserByEmail(userEmail);
+    if (user && user.role === 'admin') {
+      setIsAuthorized(true);
+    } else {
+      toast({
+        title: "Acceso Denegado",
+        description: "No tienes permisos para acceder a esta página.",
+        variant: "destructive"
+      });
+      router.push('/'); // Redirect non-admins to user page
+      return;
+    }
+    setAuthLoading(false);
+  }, [router, toast]);
+
+  useEffect(() => {
+    if (isAuthorized && !authLoading) {
+      setRequests(getShiftRequests());
+      setIsLoading(false);
+    }
+  }, [isAuthorized, authLoading]);
 
   const handleUpdateRequest = (updatedRequest: ShiftRequest) => {
     const updatedRequests = requests.map(req => 
@@ -26,10 +56,19 @@ export default function AdminPage() {
     saveShiftRequests(updatedRequests);
   };
 
-  if (isLoading) {
+  if (authLoading || (isAuthorized && isLoading)) {
     return (
       <div className="flex justify-center items-center h-64">
-        <p>Cargando datos de administración...</p>
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        <p className="ml-2">Cargando datos de administración...</p>
+      </div>
+    );
+  }
+
+  if (!isAuthorized) {
+     return (
+      <div className="flex justify-center items-center h-64">
+        <p>Redirigiendo...</p>
       </div>
     );
   }
