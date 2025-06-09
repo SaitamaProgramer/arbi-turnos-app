@@ -8,16 +8,114 @@ const USERS_KEY = 'arbitros_users_v3';
 const CLUBS_KEY = 'arbitros_clubs_v1';
 const CURRENT_USER_EMAIL_KEY = 'arbitros_current_user_email_v2';
 const ACTIVE_CLUB_ID_KEY = 'arbitros_active_club_id_v1'; 
+const TEST_DATA_INITIALIZED_KEY = 'arbitros_test_data_initialized_v1';
+
 
 export const DEFAULT_FORM_CONFIGURATION: FormConfiguration = {
   availableDays: [...DAYS_OF_WEEK],
   availableTimeSlots: [...TIME_SLOTS],
 };
 
+function initializeWithTestData() {
+  if (typeof window === 'undefined' || localStorage.getItem(TEST_DATA_INITIALIZED_KEY)) {
+    return;
+  }
+
+  console.log("Initializing with test data...");
+
+  // --- Clubes ---
+  const club1Id = "club-bh-01";
+  const club2Id = "club-rs-02";
+  const clubs: Club[] = [
+    { id: club1Id, name: "Club Bahiense de Árbitros", adminUserId: "adminUser1" },
+    { id: club2Id, name: "Club Rosaleño de Referís", adminUserId: "adminUser2" },
+  ];
+  setItem(CLUBS_KEY, clubs);
+
+  // --- Usuarios ---
+  const users: User[] = [
+    // Admins
+    { id: "adminUser1", name: "Admin Bahía", email: "admin1@example.com", password: "password", role: "admin", administeredClubId: club1Id },
+    { id: "adminUser2", name: "Admin Rosales", email: "admin2@example.com", password: "password", role: "admin", administeredClubId: club2Id },
+    // Árbitros
+    { id: "refUser1", name: "Referee Uno (Bahía)", email: "ref1@example.com", password: "password", role: "referee", memberClubIds: [club1Id] },
+    { id: "refUser2", name: "Referee Dos (Bahía)", email: "ref2@example.com", password: "password", role: "referee", memberClubIds: [club1Id] },
+    { id: "refUser3", name: "Referee Tres (Rosales)", email: "ref3@example.com", password: "password", role: "referee", memberClubIds: [club2Id] },
+    { id: "refUserMulti", name: "Referee MultiClub", email: "refMulti@example.com", password: "password", role: "referee", memberClubIds: [club1Id, club2Id] },
+  ];
+  setItem(USERS_KEY, users);
+
+  // --- Configuraciones de Formulario ---
+  const formConfigs: Record<string, FormConfiguration> = {
+    [club1Id]: {
+      availableDays: ["Lunes", "Miércoles", "Viernes"],
+      availableTimeSlots: ["Mañana (08:00-12:00)", "Tarde (12:00-18:00)"],
+    },
+    [club2Id]: {
+      availableDays: ["Sábado", "Domingo"],
+      availableTimeSlots: ["Tarde (12:00-18:00)", "Noche (18:00-23:00)"],
+    },
+  };
+  setItem(FORM_CONFIGURATIONS_KEY, formConfigs);
+
+  // --- Solicitudes de Turno ---
+  const shiftRequests: ShiftRequest[] = [
+    { 
+      id: crypto.randomUUID(), 
+      userEmail: "ref1@example.com", 
+      clubId: club1Id, 
+      days: ["Lunes"], 
+      times: ["Mañana (08:00-12:00)"], 
+      hasCar: true, 
+      notes: "Disponible solo temprano el lunes.", 
+      status: 'pending', 
+      submittedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString() // Hace 2 días
+    },
+    { 
+      id: crypto.randomUUID(), 
+      userEmail: "ref3@example.com", 
+      clubId: club2Id, 
+      days: ["Sábado"], 
+      times: ["Noche (18:00-23:00)"], 
+      hasCar: true, 
+      notes: "", 
+      status: 'assigned', 
+      assignedRefereeName: "Referee Tres (Rosales)", // Auto-asignado para el ejemplo
+      submittedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString() // Hace 3 días
+    },
+     { 
+      id: crypto.randomUUID(), 
+      userEmail: "refMulti@example.com", 
+      clubId: club1Id, // Para Club Bahiense
+      days: ["Miércoles"], 
+      times: ["Tarde (12:00-18:00)"], 
+      hasCar: false, 
+      notes: "Disponibilidad para Club Bahiense.", 
+      status: 'pending', 
+      submittedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString() // Hace 1 día
+    },
+  ];
+  setItem(SHIFT_REQUESTS_KEY, shiftRequests);
+
+  localStorage.setItem(TEST_DATA_INITIALIZED_KEY, 'true');
+  console.log("Test data initialized.");
+}
+
+
 function getItem<T>(key: string, defaultValue: T): T {
   if (typeof window === 'undefined') {
     return defaultValue;
   }
+  // Llamar a la inicialización aquí antes de intentar obtener el ítem
+  // Esto asegura que los datos de prueba se carguen si es la primera vez para esta clave.
+  // Sin embargo, para evitar múltiples console.log y lógicas, es mejor centralizar la llamada.
+  // La lógica de initializeWithTestData ya previene ejecuciones múltiples con TEST_DATA_INITIALIZED_KEY
+  if (key === USERS_KEY && !localStorage.getItem(USERS_KEY)) initializeWithTestData();
+  if (key === CLUBS_KEY && !localStorage.getItem(CLUBS_KEY)) initializeWithTestData();
+  if (key === SHIFT_REQUESTS_KEY && !localStorage.getItem(SHIFT_REQUESTS_KEY)) initializeWithTestData();
+  if (key === FORM_CONFIGURATIONS_KEY && !localStorage.getItem(FORM_CONFIGURATIONS_KEY)) initializeWithTestData();
+
+
   try {
     const data = localStorage.getItem(key);
     return data ? JSON.parse(data) : defaultValue;
@@ -37,6 +135,12 @@ function setItem<T>(key: string, value: T): void {
     console.error(`Error saving ${key} to localStorage:`, error);
   }
 }
+
+// Initialize test data once if no marker is found.
+if (typeof window !== 'undefined' && !localStorage.getItem(TEST_DATA_INITIALIZED_KEY)) {
+  initializeWithTestData();
+}
+
 
 // Current User Session
 export const setCurrentUserEmail = (email: string | null): void => {
@@ -71,7 +175,7 @@ export const saveClubs = (clubs: Club[]): void => {
 export const addClub = (name: string, adminUserId: string): Club => {
   const clubs = getClubs();
   const newClub: Club = {
-    id: crypto.randomUUID().slice(0, 8), // Shorter club ID
+    id: `club-${name.toLowerCase().replace(/\s+/g, '-').slice(0,10)}-${crypto.randomUUID().slice(0,4)}`,
     name,
     adminUserId,
   };
@@ -227,8 +331,7 @@ export const updateShiftRequestDetails = (
     times: newData.times,
     hasCar: newData.hasCar,
     notes: newData.notes,
-    // Opcional: actualizar submittedAt si se considera una "nueva" sumisión
-    // submittedAt: new Date().toISOString(), 
+    submittedAt: new Date().toISOString(), // Update submission time on edit
   };
   
   requests[requestIndex] = updatedRequest;
