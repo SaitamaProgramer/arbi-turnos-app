@@ -4,10 +4,10 @@ import { DAYS_OF_WEEK, TIME_SLOTS } from '@/types';
 
 const SHIFT_REQUESTS_KEY = 'arbitros_shift_requests_v3';
 const FORM_CONFIGURATIONS_KEY = 'arbitros_form_configurations_v2';
-const USERS_KEY = 'arbitros_users_v3'; // Incremented version for new User structure
+const USERS_KEY = 'arbitros_users_v3'; 
 const CLUBS_KEY = 'arbitros_clubs_v1';
 const CURRENT_USER_EMAIL_KEY = 'arbitros_current_user_email_v2';
-const ACTIVE_CLUB_ID_KEY = 'arbitros_active_club_id_v1'; // New key for active club selection
+const ACTIVE_CLUB_ID_KEY = 'arbitros_active_club_id_v1'; 
 
 export const DEFAULT_FORM_CONFIGURATION: FormConfiguration = {
   availableDays: [...DAYS_OF_WEEK],
@@ -41,7 +41,7 @@ function setItem<T>(key: string, value: T): void {
 // Current User Session
 export const setCurrentUserEmail = (email: string | null): void => {
   setItem(CURRENT_USER_EMAIL_KEY, email);
-  if (!email) { // Clear active club if logging out
+  if (!email) { 
     setActiveClubId(null);
   }
 };
@@ -50,7 +50,7 @@ export const getCurrentUserEmail = (): string | null => {
   return getItem(CURRENT_USER_EMAIL_KEY, null);
 };
 
-// Active Club for Referees
+// Active Club for Referees/Admins
 export const setActiveClubId = (clubId: string | null): void => {
   setItem(ACTIVE_CLUB_ID_KEY, clubId);
 };
@@ -71,7 +71,7 @@ export const saveClubs = (clubs: Club[]): void => {
 export const addClub = (name: string, adminUserId: string): Club => {
   const clubs = getClubs();
   const newClub: Club = {
-    id: crypto.randomUUID().slice(0, 8),
+    id: crypto.randomUUID().slice(0, 8), // Shorter club ID
     name,
     adminUserId,
   };
@@ -119,11 +119,11 @@ export const addUser = (
       id: userId,
       name: userData.name,
       email: userData.email,
-      password: userData.password, // Not hashed - demo only
+      password: userData.password, 
       role: 'admin',
       administeredClubId: newClub.id,
     };
-  } else { // referee
+  } else { 
     if (!userData.clubIdToJoin) {
       return { error: "El código de club es requerido para árbitros." };
     }
@@ -135,7 +135,7 @@ export const addUser = (
       id: userId,
       name: userData.name,
       email: userData.email,
-      password: userData.password, // Not hashed - demo only
+      password: userData.password, 
       role: 'referee',
       memberClubIds: [userData.clubIdToJoin],
     };
@@ -156,11 +156,18 @@ export const getRefereesByClubId = (clubId: string): User[] => {
 
 // Shift Requests
 export const getShiftRequests = (clubId?: string): ShiftRequest[] => {
-  const allRequests = getItem(SHIFT_REQUESTS_KEY, []);
+  const allRequests = getItem<ShiftRequest[]>(SHIFT_REQUESTS_KEY, []);
   if (clubId) {
     return allRequests.filter(req => req.clubId === clubId);
   }
   return allRequests;
+};
+
+export const findPendingShiftRequestForUserInClub = (userEmail: string, clubId: string): ShiftRequest | undefined => {
+  const allRequests = getItem<ShiftRequest[]>(SHIFT_REQUESTS_KEY, []);
+  return allRequests
+    .filter(req => req.userEmail === userEmail && req.clubId === clubId && req.status === 'pending')
+    .sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime())[0];
 };
 
 export const saveShiftRequests = (requests: ShiftRequest[]): void => {
@@ -180,13 +187,58 @@ export const addShiftRequest = (
     status: 'pending',
     submittedAt: new Date().toISOString(),
   };
-  const allRequestsUpdated = [...getItem(SHIFT_REQUESTS_KEY, []), newRequest];
+  const allRequestsUpdated = [...getItem<ShiftRequest[]>(SHIFT_REQUESTS_KEY, []), newRequest];
   saveShiftRequests(allRequestsUpdated);
   return newRequest;
 };
 
+export const updateShiftRequestDetails = (
+  requestId: string,
+  userEmail: string,
+  newData: {
+    days: string[];
+    times: string[];
+    hasCar: boolean;
+    notes: string;
+  }
+): ShiftRequest | null => {
+  const requests = getItem<ShiftRequest[]>(SHIFT_REQUESTS_KEY, []);
+  const requestIndex = requests.findIndex(req => req.id === requestId);
+
+  if (requestIndex === -1) {
+    console.error("Shift request not found for updating details");
+    return null;
+  }
+
+  const originalRequest = requests[requestIndex];
+
+  if (originalRequest.userEmail !== userEmail) {
+    console.error("User not authorized to update this shift request details");
+    return null;
+  }
+  if (originalRequest.status !== 'pending') {
+    console.error("Shift request is not pending, cannot update details");
+    return null;
+  }
+
+  const updatedRequest: ShiftRequest = {
+    ...originalRequest,
+    days: newData.days,
+    times: newData.times,
+    hasCar: newData.hasCar,
+    notes: newData.notes,
+    // Opcional: actualizar submittedAt si se considera una "nueva" sumisión
+    // submittedAt: new Date().toISOString(), 
+  };
+  
+  requests[requestIndex] = updatedRequest;
+  saveShiftRequests(requests);
+  return updatedRequest;
+};
+
+
 export const updateShiftRequestStatus = (id: string, status: ShiftRequest['status'], assignedRefereeName?: string): ShiftRequest | null => {
-  const requests = getItem(SHIFT_REQUESTS_KEY, []);
+  const requests = getItem<ShiftRequest[]>(SHIFT_REQUESTS_KEY, []);
   const requestIndex = requests.findIndex(req => req.id === id);
 
   if (requestIndex === -1) {

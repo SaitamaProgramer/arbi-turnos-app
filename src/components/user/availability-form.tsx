@@ -28,11 +28,12 @@ import {
   getActiveClubId, 
   setActiveClubId,
   getClubNameById,
-  getClubs,
-  findClubById
+  findClubById,
+  findPendingShiftRequestForUserInClub,
+  updateShiftRequestDetails,
 } from "@/lib/localStorage";
-import type { FormConfiguration, User, Club } from "@/types";
-import { CalendarDays, Clock, Car, ClipboardList, Send, Loader2, AlertTriangle, Users } from "lucide-react";
+import type { FormConfiguration, User, Club, ShiftRequest } from "@/types";
+import { CalendarDays, Clock, Car, ClipboardList, Send, Loader2, AlertTriangle, Users, Edit3 } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
@@ -45,7 +46,7 @@ const availabilityFormSchema = z.object({
   }),
   hasCar: z.string({ required_error: "Por favor, indica si tienes auto." }),
   notes: z.string().max(500, "Las notas no pueden exceder los 500 caracteres.").optional(),
-  selectedClubId: z.string().optional(), // For club selection by referee
+  selectedClubId: z.string().optional(), 
 });
 
 type AvailabilityFormValues = z.infer<typeof availabilityFormSchema>;
@@ -58,6 +59,8 @@ export default function AvailabilityForm() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentActiveClubId, setCurrentActiveClubId] = useState<string | null>(null);
   const [userClubs, setUserClubs] = useState<Club[]>([]);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editingRequestId, setEditingRequestId] = useState<string | null>(null);
 
   const form = useForm<AvailabilityFormValues>({
     resolver: zodResolver(availabilityFormSchema),
@@ -70,16 +73,43 @@ export default function AvailabilityForm() {
     },
   });
   
-  const loadClubSpecificData = useCallback(async (clubId: string | null) => {
+  const loadClubAndAvailabilityData = useCallback(async (clubId: string | null, userEmail: string | null) => {
     if (!clubId) {
       setFormConfig(null);
+      setIsEditing(false);
+      setEditingRequestId(null);
+      form.reset({ days: [], times: [], hasCar: undefined, notes: "", selectedClubId: clubId || "" });
       setIsLoading(false);
       return;
     }
+
     setIsLoading(true);
     const config = getFormConfiguration(clubId);
     setFormConfig(config);
-    form.setValue("selectedClubId", clubId); // Sync form state
+    form.setValue("selectedClubId", clubId);
+
+    if (userEmail) {
+      const pendingRequest = findPendingShiftRequestForUserInClub(userEmail, clubId);
+      if (pendingRequest) {
+        form.reset({
+          days: pendingRequest.days,
+          times: pendingRequest.times,
+          hasCar: pendingRequest.hasCar ? "true" : "false",
+          notes: pendingRequest.notes,
+          selectedClubId: clubId,
+        });
+        setIsEditing(true);
+        setEditingRequestId(pendingRequest.id);
+      } else {
+        form.reset({ days: [], times: [], hasCar: undefined, notes: "", selectedClubId: clubId });
+        setIsEditing(false);
+        setEditingRequestId(null);
+      }
+    } else {
+      form.reset({ days: [], times: [], hasCar: undefined, notes: "", selectedClubId: clubId });
+      setIsEditing(false);
+      setEditingRequestId(null);
+    }
     setIsLoading(false);
   }, [form]);
 
@@ -115,60 +145,65 @@ export default function AvailabilityForm() {
 
       let initialActiveClubId = getActiveClubId();
       if (!initialActiveClubId || !userDetails.memberClubIds.includes(initialActiveClubId)) {
-        initialActiveClubId = userDetails.memberClubIds[0];
+        initialActiveClubId = userDetails.memberClubIds[0]; // Default to first club if active is not set or not in user's list
         setActiveClubId(initialActiveClubId);
       }
       setCurrentActiveClubId(initialActiveClubId);
-      loadClubSpecificData(initialActiveClubId);
+      loadClubAndAvailabilityData(initialActiveClubId, userDetails.email);
     }
-  }, [router, toast, loadClubSpecificData]);
+  }, [router, toast, loadClubAndAvailabilityData]);
 
 
   const handleClubChange = (newClubId: string) => {
     setActiveClubId(newClubId);
     setCurrentActiveClubId(newClubId);
-    loadClubSpecificData(newClubId);
-    form.reset({ // Reset form fields when club changes, except selectedClubId
-      days: [],
-      times: [],
-      hasCar: undefined,
-      notes: "",
-      selectedClubId: newClubId
-    });
+    if (currentUser?.email) {
+      loadClubAndAvailabilityData(newClubId, currentUser.email);
+    }
   };
 
   function onSubmit(data: AvailabilityFormValues) {
-    const actualClubId = currentActiveClubId; // Use state for active club
+    const actualClubId = currentActiveClubId; 
     if (!currentUser || !currentUser.email || !actualClubId) {
-      toast({ title: "Error", description: "No se pudo identificar al usuario o su club activo. Por favor, reinicia sesión o selecciona un club.", variant: "destructive" });
-      // router.push('/login'); // Might be too aggressive
+      toast({ title: "Error", description: "No se pudo identificar al usuario o su club activo.", variant: "destructive" });
       return;
     }
-    addShiftRequest(
-      {
-        days: data.days,
-        times: data.times,
-        hasCar: data.hasCar === "true",
-        notes: data.notes || "",
-      },
-      currentUser.email,
-      actualClubId
-    );
-    toast({
-      title: "Disponibilidad Enviada",
-      description: `Tu disponibilidad ha sido registrada para el club: ${getClubNameById(actualClubId) || 'Desconocido'}.`,
-      variant: "default",
-    });
-    form.reset({ // Reset form fields after submission, keeping selected club
-      days: [],
-      times: [],
-      hasCar: undefined,
-      notes: "",
-      selectedClubId: actualClubId
-    });
+
+    const requestPayload = {
+      days: data.days,
+      times: data.times,
+      hasCar: data.hasCar === "true",
+      notes: data.notes || "",
+    };
+
+    if (isEditing && editingRequestId) {
+      const updatedRequest = updateShiftRequestDetails(editingRequestId, currentUser.email, requestPayload);
+      if (updatedRequest) {
+        toast({
+          title: "Disponibilidad Actualizada",
+          description: `Tu disponibilidad ha sido actualizada para el club: ${getClubNameById(actualClubId) || 'Desconocido'}.`,
+        });
+      } else {
+        toast({ title: "Error al Actualizar", description: "No se pudo actualizar la disponibilidad. Puede que ya no esté pendiente o no tengas permiso.", variant: "destructive" });
+      }
+    } else {
+      addShiftRequest(
+        requestPayload,
+        currentUser.email,
+        actualClubId
+      );
+      toast({
+        title: "Disponibilidad Enviada",
+        description: `Tu disponibilidad ha sido registrada para el club: ${getClubNameById(actualClubId) || 'Desconocido'}.`,
+      });
+      // After successful NEW submission, try to load it for editing (it will be pending)
+      loadClubAndAvailabilityData(actualClubId, currentUser.email);
+    }
+    // Don't reset form here if editing, it's already showing the latest data.
+    // If new, loadClubAndAvailabilityData will fetch and set it to editing mode.
   }
   
-  if (!currentUser && isLoading) { // Initial loading before user is set
+  if (!currentUser && isLoading) { 
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -177,7 +212,7 @@ export default function AvailabilityForm() {
     );
   }
 
-  if (!currentUser) { // Should be caught by useEffect redirect, but as a safeguard
+  if (!currentUser) { 
     return (
       <div className="flex justify-center items-center h-64">
         <p>Redirigiendo a inicio de sesión...</p>
@@ -214,11 +249,11 @@ export default function AvailabilityForm() {
       <CardHeader>
         <CardTitle className="text-2xl font-headline flex items-center gap-2">
           <ClipboardList className="text-primary" />
-          Registrar Disponibilidad
+          {isEditing ? "Editar Disponibilidad" : "Registrar Disponibilidad"}
         </CardTitle>
         <CardDescription>
           {currentUser.role === 'referee' && userClubs.length > 1 && "Selecciona un club y luego "}
-          Completa el formulario para indicar tus días y horarios disponibles.
+          {isEditing ? "Modifica los detalles de tu disponibilidad para el club seleccionado." : "Completa el formulario para indicar tus días y horarios disponibles."}
           {currentActiveClubId && ` (Para Club: ${getClubNameById(currentActiveClubId) || 'Desconocido'})`}
         </CardDescription>
       </CardHeader>
@@ -232,10 +267,13 @@ export default function AvailabilityForm() {
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel className="text-base flex items-center gap-2"><Users className="text-primary"/>Seleccionar Club</FormLabel>
-                    <Select onValueChange={(value) => {field.onChange(value); handleClubChange(value);}} value={field.value || currentActiveClubId || ""}>
+                    <Select 
+                      onValueChange={(value) => {field.onChange(value); handleClubChange(value);}} 
+                      value={field.value || currentActiveClubId || ""}
+                    >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecciona el club para el que enviarás disponibilidad" />
+                          <SelectValue placeholder="Selecciona el club" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -255,7 +293,7 @@ export default function AvailabilityForm() {
             {isLoading && currentActiveClubId && (
                  <div className="flex justify-center items-center h-32">
                     <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <p className="ml-2">Cargando configuración del club...</p>
+                    <p className="ml-2">Cargando configuración y disponibilidad...</p>
                 </div>
             )}
 
@@ -393,7 +431,7 @@ export default function AvailabilityForm() {
                       <FormControl>
                         <RadioGroup
                           onValueChange={field.onChange}
-                          defaultValue={field.value}
+                          value={field.value} // Ensure value is controlled
                           className="flex flex-col space-y-1 sm:flex-row sm:space-y-0 sm:space-x-4"
                         >
                           <FormItem className="flex items-center space-x-3 space-y-0">
@@ -435,9 +473,13 @@ export default function AvailabilityForm() {
                     </FormItem>
                   )}
                 />
-                <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isLoading || noClubSelectedOrConfigured}>
-                  <Send className="mr-2 h-4 w-4" />
-                  Enviar Disponibilidad
+                <Button 
+                  type="submit" 
+                  className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" 
+                  disabled={isLoading || noClubSelectedOrConfigured}
+                >
+                  {isEditing ? <Edit3 className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
+                  {isEditing ? "Actualizar Disponibilidad" : "Enviar Disponibilidad"}
                 </Button>
               </>
             )}
