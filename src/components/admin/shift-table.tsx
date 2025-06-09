@@ -22,7 +22,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
+  // AlertDialogTrigger, // Removed
 } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -139,11 +139,11 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
               <TableCell>{request.assignedRefereeName || "-"}</TableCell>
               <TableCell className="text-right">
                 {request.status === "pending" && (
-                  <AlertDialogTrigger asChild>
+                  // <AlertDialogTrigger asChild> // Removed wrapper
                     <Button variant="outline" size="sm" className="border-primary text-primary hover:bg-primary/10" onClick={() => setAssigningRequestId(request.id)}>
                       <UserPlus className="mr-2 h-4 w-4" /> Asignar
                     </Button>
-                  </AlertDialogTrigger>
+                  // </AlertDialogTrigger> // Removed wrapper
                 )}
                 {request.status === "assigned" && (
                   <Button variant="outline" size="sm" onClick={() => handleMarkAsCompleted(request.id)} className="border-accent text-accent hover:bg-accent/10">
@@ -183,3 +183,4 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
     </div>
   );
 }
+
