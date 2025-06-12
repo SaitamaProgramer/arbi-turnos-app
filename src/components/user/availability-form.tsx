@@ -22,7 +22,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { 
   addShiftRequest, 
-  getFormConfiguration, 
   getCurrentUserEmail, 
   findUserByEmail, 
   getActiveClubId, 
@@ -31,18 +30,22 @@ import {
   findClubById,
   findPendingShiftRequestForUserInClub,
   updateShiftRequestDetails,
+  getClubDefinedMatches, // New import
 } from "@/lib/localStorage";
-import type { FormConfiguration, User, Club, ShiftRequest } from "@/types";
-import { CalendarDays, Clock, Car, ClipboardList, Send, Loader2, AlertTriangle, Users, Edit3, Info } from "lucide-react";
+import type { User, Club, ShiftRequest, ClubSpecificMatch } from "@/types"; // Added ClubSpecificMatch
+import { CalendarDays, Clock, Car, ClipboardList, Send, Loader2, AlertTriangle, Users, Edit3, Info, ListChecks } from "lucide-react"; // Replaced CalendarDays, Clock with ListChecks
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 
+// Schema for selected matches
+const clubSpecificMatchSchema = z.object({
+  id: z.string(),
+  description: z.string(),
+});
+
 const availabilityFormSchema = z.object({
-  days: z.array(z.string()).refine((value) => value.some((item) => item), {
-    message: "Debes seleccionar al menos un día.",
-  }),
-  times: z.array(z.string()).refine((value) => value.some((item) => item), {
-    message: "Debes seleccionar al menos un horario.",
+  selectedMatches: z.array(clubSpecificMatchSchema).refine((value) => value.length > 0, { // Changed from days/times
+    message: "Debes seleccionar al menos un partido/turno.",
   }),
   hasCar: z.string({ required_error: "Por favor, indica si tienes auto." }),
   notes: z.string().max(500, "Las notas no pueden exceder los 500 caracteres.").optional(),
@@ -54,7 +57,8 @@ type AvailabilityFormValues = z.infer<typeof availabilityFormSchema>;
 export default function AvailabilityForm() {
   const { toast } = useToast();
   const router = useRouter();
-  const [formConfig, setFormConfig] = useState<FormConfiguration | null>(null);
+  // const [formConfig, setFormConfig] = useState<FormConfiguration | null>(null); // Removed FormConfiguration
+  const [clubMatches, setClubMatches] = useState<ClubSpecificMatch[]>([]); // New state for club-defined matches
   const [isLoading, setIsLoading] = useState(true);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentActiveClubId, setCurrentActiveClubId] = useState<string | null>(null);
@@ -65,8 +69,7 @@ export default function AvailabilityForm() {
   const form = useForm<AvailabilityFormValues>({
     resolver: zodResolver(availabilityFormSchema),
     defaultValues: {
-      days: [],
-      times: [],
+      selectedMatches: [], // Changed
       hasCar: undefined, 
       notes: "",
       selectedClubId: "",
@@ -75,38 +78,37 @@ export default function AvailabilityForm() {
   
   const loadClubAndAvailabilityData = useCallback(async (clubId: string | null, userEmail: string | null) => {
     if (!clubId) {
-      setFormConfig(null);
+      setClubMatches([]); // Clear matches
       setIsEditing(false);
       setEditingRequestId(null);
-      form.reset({ days: [], times: [], hasCar: undefined, notes: "", selectedClubId: clubId || "" });
+      form.reset({ selectedMatches: [], hasCar: undefined, notes: "", selectedClubId: clubId || "" });
       setIsLoading(false);
       return;
     }
 
     setIsLoading(true);
-    const config = getFormConfiguration(clubId);
-    setFormConfig(config);
-    form.setValue("selectedClubId", clubId); // Ensure selectedClubId in form state is up-to-date
+    const matchesForClub = getClubDefinedMatches(clubId); // Get specific matches for the club
+    setClubMatches(matchesForClub);
+    form.setValue("selectedClubId", clubId);
 
     if (userEmail) {
       const pendingRequest = findPendingShiftRequestForUserInClub(userEmail, clubId);
       if (pendingRequest) {
         form.reset({
-          days: pendingRequest.days,
-          times: pendingRequest.times,
+          selectedMatches: pendingRequest.selectedMatches, // Populate with selected matches
           hasCar: pendingRequest.hasCar ? "true" : "false",
-          notes: pendingRequest.notes || "", // Ensure notes is not undefined
+          notes: pendingRequest.notes || "",
           selectedClubId: clubId,
         });
         setIsEditing(true);
         setEditingRequestId(pendingRequest.id);
       } else {
-        form.reset({ days: [], times: [], hasCar: undefined, notes: "", selectedClubId: clubId });
+        form.reset({ selectedMatches: [], hasCar: undefined, notes: "", selectedClubId: clubId });
         setIsEditing(false);
         setEditingRequestId(null);
       }
     } else {
-      form.reset({ days: [], times: [], hasCar: undefined, notes: "", selectedClubId: clubId });
+      form.reset({ selectedMatches: [], hasCar: undefined, notes: "", selectedClubId: clubId });
       setIsEditing(false);
       setEditingRequestId(null);
     }
@@ -128,14 +130,14 @@ export default function AvailabilityForm() {
     }
     
     if (userDetails.role === 'admin') {
-      toast({ title: "Acceso no Permitido", description: "Los administradores gestionan turnos, no envían disponibilidad.", variant: "destructive" });
+      toast({ title: "Acceso no Permitido", description: "Los administradores gestionan, no se postulan.", variant: "destructive" });
       router.push('/admin');
       return;
     }
 
     if (userDetails.role === 'referee') {
       if (!userDetails.memberClubIds || userDetails.memberClubIds.length === 0) {
-        toast({ title: "Sin Clubes", description: "No estás asociado a ningún club. Contacta a un administrador.", variant: "destructive"});
+        toast({ title: "Sin Clubes", description: "No estás asociado a ningún club.", variant: "destructive"});
         setIsLoading(false);
         return;
       }
@@ -174,8 +176,7 @@ export default function AvailabilityForm() {
     }
 
     const requestPayload = {
-      days: data.days,
-      times: data.times,
+      selectedMatches: data.selectedMatches, // Changed
       hasCar: data.hasCar === "true",
       notes: data.notes || "",
     };
@@ -184,31 +185,23 @@ export default function AvailabilityForm() {
       const updatedRequest = updateShiftRequestDetails(editingRequestId, currentUser.email, requestPayload);
       if (updatedRequest) {
         toast({
-          title: "Disponibilidad Actualizada",
-          description: `Tu disponibilidad para el club ${getClubNameById(actualClubId) || 'actual'} ha sido actualizada.`,
+          title: "Postulación Actualizada",
+          description: `Tu postulación para el club ${getClubNameById(actualClubId) || 'actual'} ha sido actualizada.`,
         });
-        // No need to reset form, it already reflects the edited state. loadClubAndAvailabilityData will be called by club change or initial load.
       } else {
-        toast({ title: "Error al Actualizar", description: "No se pudo actualizar la disponibilidad. Puede que ya no esté pendiente o no tengas permiso.", variant: "destructive" });
+        toast({ title: "Error al Actualizar", description: "No se pudo actualizar la postulación.", variant: "destructive" });
       }
     } else {
-      const newShift = addShiftRequest(
-        requestPayload,
-        currentUser.email,
-        actualClubId
-      );
+      const newShift = addShiftRequest(requestPayload, currentUser.email, actualClubId);
       if (newShift) {
         toast({
-          title: "Disponibilidad Enviada",
-          description: `Tu disponibilidad ha sido registrada para el club ${getClubNameById(actualClubId) || 'actual'}. Ahora puedes revisarla o editarla si es necesario.`,
+          title: "Postulación Enviada",
+          description: `Tu postulación ha sido registrada para el club ${getClubNameById(actualClubId) || 'actual'}.`,
         });
-        // After successful NEW submission, set component state to reflect editing this new request
         setIsEditing(true);
         setEditingRequestId(newShift.id);
-        // Form values are already what was submitted, no need to form.reset if we want them to see what they just submitted.
-        // loadClubAndAvailabilityData(actualClubId, currentUser.email); // This will re-fetch and re-set the form, confirming the new state.
       } else {
-         toast({ title: "Error al Enviar", description: "No se pudo registrar tu disponibilidad.", variant: "destructive" });
+         toast({ title: "Error al Enviar", description: "No se pudo registrar tu postulación.", variant: "destructive" });
       }
     }
   }
@@ -223,8 +216,6 @@ export default function AvailabilityForm() {
   }
 
   if (!currentUser && !isLoading) { 
-    // This case implies redirection to login should have happened or is about to.
-    // findUserByEmail might have returned null after an email was cleared from localStorage.
     return (
       <div className="flex justify-center items-center h-64">
         <p>Verificando sesión...</p>
@@ -232,9 +223,7 @@ export default function AvailabilityForm() {
     );
   }
   
-  // Ensure currentUser is checked before accessing its properties
   if (!currentUser) return null;
-
 
   if (currentUser.role === 'referee' && (!currentUser.memberClubIds || currentUser.memberClubIds.length === 0)) {
     return (
@@ -242,37 +231,33 @@ export default function AvailabilityForm() {
         <CardHeader>
            <CardTitle className="text-2xl font-headline flex items-center gap-2">
             <ClipboardList className="text-primary" />
-            Registrar Disponibilidad
+            Postularse a Partidos/Turnos
           </CardTitle>
         </CardHeader>
         <CardContent className="text-center py-10">
           <AlertTriangle className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
           <p className="text-xl font-semibold text-muted-foreground mb-2">No Asociado a Clubes</p>
-          <p className="text-sm text-muted-foreground">
-            Actualmente no estás registrado en ningún club. Para enviar tu disponibilidad,
-            primero debes unirte a un club usando un código de invitación
-            o contactar a un administrador de club.
-          </p>
+          <p>Contacta a un administrador para unirte a un club.</p>
         </CardContent>
       </Card>
      );
   }
   
-  const noClubSelectedOrConfigured = !currentActiveClubId || !formConfig || formConfig.availableDays.length === 0 || formConfig.availableTimeSlots.length === 0;
+  const noClubSelectedOrMatchesConfigured = !currentActiveClubId || clubMatches.length === 0;
   const activeClubName = currentActiveClubId ? getClubNameById(currentActiveClubId) : 'Desconocido';
 
   return (
     <Card className="w-full max-w-2xl mx-auto shadow-lg">
       <CardHeader>
         <CardTitle className="text-2xl font-headline flex items-center gap-2">
-          {isEditing ? <Edit3 className="text-primary" /> : <ClipboardList className="text-primary" />}
-          {isEditing ? "Editar Disponibilidad Enviada" : "Registrar Disponibilidad"}
+          {isEditing ? <Edit3 className="text-primary" /> : <ListChecks className="text-primary" />}
+          {isEditing ? "Editar Postulación Enviada" : "Postularse a Partidos/Turnos"}
         </CardTitle>
         <CardDescription>
           {currentUser.role === 'referee' && userClubs.length > 1 && "Selecciona un club y luego "}
-          {isEditing ? "Modifica los detalles de tu disponibilidad para el club:" : "Completa el formulario para indicar tus días y horarios disponibles para el club:"}
+          {isEditing ? "Modifica los detalles de tu postulación para el club:" : "Selecciona los partidos/turnos a los que deseas postularte para el club:"}
           <strong className="ml-1">{activeClubName}</strong>.
-          {isEditing && <span className="block text-xs text-accent mt-1 italic"><Info size={12} className="inline mr-1"/>Estás editando una disponibilidad previamente enviada.</span>}
+          {isEditing && <span className="block text-xs text-accent mt-1 italic"><Info size={12} className="inline mr-1"/>Estás editando una postulación previamente enviada.</span>}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -311,18 +296,18 @@ export default function AvailabilityForm() {
             {isLoading && currentActiveClubId && (
                  <div className="flex justify-center items-center h-32">
                     <Loader2 className="h-6 w-6 animate-spin text-primary" />
-                    <p className="ml-2">Cargando configuración y disponibilidad...</p>
+                    <p className="ml-2">Cargando partidos y postulación...</p>
                 </div>
             )}
 
-            {!isLoading && noClubSelectedOrConfigured && currentActiveClubId && (
+            {!isLoading && noClubSelectedOrMatchesConfigured && currentActiveClubId && (
               <div className="text-center py-6">
                 <AlertTriangle className="mx-auto h-10 w-10 text-yellow-500 mb-3" />
                 <p className="text-lg font-semibold text-muted-foreground mb-1">
-                   Formulario No Configurado para {activeClubName}
+                   No hay Partidos Definidos para {activeClubName}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  El administrador del club aún no ha configurado los días y horarios.
+                  El administrador del club aún no ha definido partidos/turnos para postularse.
                 </p>
               </div>
             )}
@@ -336,110 +321,54 @@ export default function AvailabilityForm() {
                  </div>
              )}
 
-
-            {!isLoading && currentActiveClubId && formConfig && formConfig.availableDays.length > 0 && formConfig.availableTimeSlots.length > 0 && (
+            {!isLoading && currentActiveClubId && clubMatches.length > 0 && (
               <>
                 <FormField
                   control={form.control}
-                  name="days"
+                  name="selectedMatches"
                   render={() => (
                     <FormItem>
                       <div className="mb-4">
-                        <FormLabel className="text-base flex items-center gap-2"><CalendarDays className="text-primary"/>Días Disponibles</FormLabel>
+                        <FormLabel className="text-base flex items-center gap-2"><ListChecks className="text-primary"/>Partidos/Turnos Disponibles</FormLabel>
                         <FormDescription>
-                          Selecciona los días de la semana en los que puedes arbitrar (según configuración de tu club).
+                          Selecciona los partidos o bloques de turno a los que te postulas.
                         </FormDescription>
                       </div>
-                      {formConfig.availableDays.length > 0 ? (
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                          {formConfig.availableDays.map((day) => (
-                            <FormField
-                              key={`day-select-${day}`}
-                              control={form.control}
-                              name="days"
-                              render={({ field }) => {
-                                return (
-                                  <FormItem
-                                    key={day}
-                                    className="flex flex-row items-start space-x-3 space-y-0"
-                                  >
-                                    <FormControl>
-                                      <Checkbox
-                                        checked={field.value?.includes(day)}
-                                        onCheckedChange={(checked) => {
-                                          return checked
-                                            ? field.onChange([...(field.value || []), day])
-                                            : field.onChange(
-                                                (field.value || []).filter(
-                                                  (value) => value !== day
-                                                )
-                                              );
-                                        }}
-                                      />
-                                    </FormControl>
-                                    <FormLabel className="font-normal">
-                                      {day}
-                                    </FormLabel>
-                                  </FormItem>
-                                );
-                              }}
-                            />
-                          ))}
-                        </div>
-                      ) : <p className="text-sm text-muted-foreground">No hay días configurados por el administrador de tu club.</p>}
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-
-                <FormField
-                  control={form.control}
-                  name="times"
-                  render={() => (
-                    <FormItem>
-                      <div className="mb-4">
-                        <FormLabel className="text-base flex items-center gap-2"><Clock className="text-primary"/>Horarios Disponibles</FormLabel>
-                        <FormDescription>
-                          Selecciona los bloques horarios en los que estás disponible (según configuración de tu club).
-                        </FormDescription>
-                      </div>
-                      {formConfig.availableTimeSlots.length > 0 ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        {formConfig.availableTimeSlots.map((time) => (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        {clubMatches.map((match) => (
                           <FormField
-                            key={`time-select-${time}`}
+                            key={match.id}
                             control={form.control}
-                            name="times"
+                            name="selectedMatches"
                             render={({ field }) => {
                               return (
                                 <FormItem
-                                  key={time}
-                                  className="flex flex-row items-start space-x-3 space-y-0"
+                                  key={match.id}
+                                  className="flex flex-row items-start space-x-3 space-y-0 p-2 bg-muted/30 rounded-md border"
                                 >
                                   <FormControl>
                                     <Checkbox
-                                      checked={field.value?.includes(time)}
+                                      checked={field.value?.some(m => m.id === match.id)}
                                       onCheckedChange={(checked) => {
                                         return checked
-                                          ? field.onChange([...(field.value || []), time])
+                                          ? field.onChange([...(field.value || []), match])
                                           : field.onChange(
                                               (field.value || []).filter(
-                                                (value) => value !== time
+                                                (value) => value.id !== match.id
                                               )
                                             );
                                       }}
                                     />
                                   </FormControl>
-                                  <FormLabel className="font-normal">
-                                    {time}
+                                  <FormLabel className="font-normal text-sm">
+                                    {match.description}
                                   </FormLabel>
                                 </FormItem>
                               );
                             }}
                           />
                         ))}
-                        </div>
-                        ) : <p className="text-sm text-muted-foreground">No hay horarios configurados por el administrador de tu club.</p>}
+                      </div>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -484,14 +413,11 @@ export default function AvailabilityForm() {
                       <FormLabel className="text-base flex items-center gap-2"><ClipboardList className="text-primary"/>Aclaraciones Adicionales (Opcional)</FormLabel>
                       <FormControl>
                         <Textarea
-                          placeholder="Ej: Preferencia por partidos juveniles, disponibilidad limitada en ciertos horarios específicos..."
+                          placeholder="Ej: Alguna preferencia horaria específica dentro de un bloque, si tienes alguna limitación, etc."
                           className="resize-none"
                           {...field}
                         />
                       </FormControl>
-                      <FormDescription>
-                        Cualquier información relevante que el administrador de tu club deba conocer.
-                      </FormDescription>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -499,10 +425,10 @@ export default function AvailabilityForm() {
                 <Button 
                   type="submit" 
                   className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" 
-                  disabled={isLoading || noClubSelectedOrConfigured && !!currentActiveClubId}
+                  disabled={isLoading || (noClubSelectedOrMatchesConfigured && !!currentActiveClubId)}
                 >
                   {isEditing ? <Edit3 className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
-                  {isEditing ? "Actualizar Disponibilidad" : "Enviar Disponibilidad"}
+                  {isEditing ? "Actualizar Postulación" : "Enviar Postulación"}
                 </Button>
               </>
             )}

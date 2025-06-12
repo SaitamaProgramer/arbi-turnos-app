@@ -3,21 +3,23 @@
 
 import { useEffect, useState } from "react";
 import ShiftTable from "@/components/admin/shift-table";
-import FormConfigEditor from "@/components/admin/form-config-editor";
-import AdminDashboard from "@/components/admin/admin-dashboard"; // Nuevo componente para dashboard
+// import FormConfigEditor from "@/components/admin/form-config-editor"; // Renamed/Replaced
+import ClubMatchManager from "@/components/admin/form-config-editor"; // Using the new component
+import AdminDashboard from "@/components/admin/admin-dashboard";
 import { 
   getShiftRequests, 
   getCurrentUserEmail, 
   findUserByEmail, 
   findClubById,
   getRefereesByClubId,
-  getActiveClubId, // Importar para verificar si el admin es árbitro en otro club
-  setActiveClubId // Potencialmente para limpiar si un admin intenta actuar como árbitro
+  getActiveClubId,
+  setActiveClubId,
+  // getFormConfiguration, // No longer used directly here for configuration
 } from "@/lib/localStorage";
 import type { ShiftRequest, User, Club } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClipboardList, Settings, Loader2, ShieldAlert, Info, Copy, LayoutDashboard } from "lucide-react";
+import { ClipboardList, Settings, Loader2, ShieldAlert, Info, Copy, LayoutDashboard, CalendarPlus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
@@ -38,15 +40,13 @@ export default function AdminPage() {
       return;
     }
     const user = findUserByEmail(userEmail);
-     setCurrentUser(user); // Set current user early for conditional rendering
+     setCurrentUser(user); 
 
     if (user && user.role === 'admin' && user.administeredClubId) {
       const adminClubId = user.administeredClubId;
-      // Ensure admin is not trying to use an "active referee club" context here
-      // This logic might be refined based on whether an admin can also be a referee for other clubs
       const activeRefereeClub = getActiveClubId();
       if (activeRefereeClub && activeRefereeClub !== adminClubId) {
-          setActiveClubId(adminClubId); // Force admin's club context
+          setActiveClubId(adminClubId); 
       }
 
       const club = findClubById(adminClubId);
@@ -68,7 +68,7 @@ export default function AdminPage() {
       router.push('/');
       return;
     }
-     else { // Not admin or admin without club
+     else { 
       toast({
         title: "Acceso Denegado",
         description: "No tienes permisos de administrador o no estás asociado a un club.",
@@ -86,7 +86,6 @@ export default function AdminPage() {
       req.id === updatedRequest.id ? updatedRequest : req
     );
     setRequests(updatedRequests);
-    // Actual saving is handled by updateShiftRequestStatus
   };
 
   const copyClubId = () => {
@@ -101,7 +100,7 @@ export default function AdminPage() {
     }
   };
 
-  if (isLoading || !currentUser) { // Added !currentUser to condition
+  if (isLoading || !currentUser) { 
     return (
       <div className="flex justify-center items-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
@@ -110,7 +109,7 @@ export default function AdminPage() {
     );
   }
 
-  if (!currentClub && currentUser?.role === 'admin') { // If admin but club couldn't be found
+  if (!currentClub && currentUser?.role === 'admin') { 
      return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
         <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
@@ -120,7 +119,6 @@ export default function AdminPage() {
     );
   }
   
-  // This case should ideally be caught by the useEffect redirect logic
   if (currentUser.role !== 'admin' || !currentClub) {
      return (
       <div className="flex flex-col items-center justify-center h-64 text-center">
@@ -140,7 +138,7 @@ export default function AdminPage() {
             Panel de Admin: {currentClub.name}
           </CardTitle>
           <CardDescription>
-            Gestiona las solicitudes de disponibilidad, los turnos asignados y la configuración del formulario para tu club.
+            Gestiona las postulaciones, los turnos asignados y define los partidos/turnos disponibles para tu club.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -150,10 +148,10 @@ export default function AdminPage() {
                 <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
               </TabsTrigger>
               <TabsTrigger value="shifts">
-                <ClipboardList className="mr-2 h-4 w-4" /> Gestión de Turnos
+                <ClipboardList className="mr-2 h-4 w-4" /> Gestionar Postulaciones
               </TabsTrigger>
-              <TabsTrigger value="form-config">
-                <Settings className="mr-2 h-4 w-4" /> Configurar Formulario
+              <TabsTrigger value="match-manager"> {/* Changed value and text */}
+                <CalendarPlus className="mr-2 h-4 w-4" /> Definir Partidos/Turnos
               </TabsTrigger>
                <TabsTrigger value="club-info">
                 <Info className="mr-2 h-4 w-4" /> Info del Club
@@ -169,8 +167,8 @@ export default function AdminPage() {
             <TabsContent value="shifts">
               <ShiftTable requests={requests} onUpdateRequest={handleUpdateRequest} clubId={currentClub.id} />
             </TabsContent>
-            <TabsContent value="form-config">
-              <FormConfigEditor clubId={currentClub.id} />
+            <TabsContent value="match-manager"> {/* Changed value */}
+              <ClubMatchManager clubId={currentClub.id} />
             </TabsContent>
             <TabsContent value="club-info">
               <Card>

@@ -2,7 +2,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,73 +14,83 @@ import {
   FormLabel,
   FormMessage,
 } from "@/components/ui/form";
-import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { getFormConfiguration, saveFormConfiguration } from "@/lib/localStorage";
-import { DAYS_OF_WEEK, TIME_SLOTS, type FormConfiguration } from "@/types";
+import { getClubDefinedMatches, saveClubDefinedMatches } from "@/lib/localStorage";
+import type { ClubSpecificMatch } from "@/types";
 import { useEffect, useState } from "react";
-import { Save, Settings2, CalendarDays, Clock, Loader2 } from "lucide-react";
+import { Save, Settings2, ListPlus, Trash2, Loader2, CalendarPlus } from "lucide-react";
 
-const formConfigSchema = z.object({
-  configuredDays: z.array(z.string()).refine((value) => value.some((item) => item), {
-    message: "Debes seleccionar al menos un día.",
-  }),
-  configuredTimeSlots: z.array(z.string()).refine((value) => value.some((item) => item), {
-    message: "Debes seleccionar al menos un horario.",
-  }),
+const matchSchema = z.object({
+  id: z.string(),
+  description: z.string().min(5, { message: "La descripción debe tener al menos 5 caracteres." }),
 });
 
-type FormConfigValues = z.infer<typeof formConfigSchema>;
+const clubMatchesFormSchema = z.object({
+  matches: z.array(matchSchema),
+});
 
-interface FormConfigEditorProps {
+type ClubMatchesFormValues = z.infer<typeof clubMatchesFormSchema>;
+
+interface ClubMatchManagerProps {
   clubId: string;
 }
 
-export default function FormConfigEditor({ clubId }: FormConfigEditorProps) {
+export default function ClubMatchManager({ clubId }: ClubMatchManagerProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   
-  const form = useForm<FormConfigValues>({
-    resolver: zodResolver(formConfigSchema),
+  const form = useForm<ClubMatchesFormValues>({
+    resolver: zodResolver(clubMatchesFormSchema),
     defaultValues: {
-      configuredDays: [],
-      configuredTimeSlots: [],
+      matches: [],
     },
+  });
+
+  const { fields, append, remove } = useFieldArray({
+    control: form.control,
+    name: "matches",
   });
 
   useEffect(() => {
     if (clubId) {
-      const currentConfig = getFormConfiguration(clubId);
+      setIsLoading(true);
+      const currentMatches = getClubDefinedMatches(clubId);
       form.reset({
-        configuredDays: currentConfig.availableDays,
-        configuredTimeSlots: currentConfig.availableTimeSlots,
+        matches: currentMatches.map(m => ({ id: m.id, description: m.description })),
       });
       setIsLoading(false);
     }
   }, [form, clubId]);
 
-  function onSubmit(data: FormConfigValues) {
+  function onSubmit(data: ClubMatchesFormValues) {
     if (!clubId) {
       toast({ title: "Error", description: "No se pudo identificar el club.", variant: "destructive" });
       return;
     }
-    const newConfig: FormConfiguration = {
-      availableDays: data.configuredDays,
-      availableTimeSlots: data.configuredTimeSlots,
-    };
-    saveFormConfiguration(clubId, newConfig);
+    // Ensure new matches get a unique ID if they don't have one (though append should handle it)
+    const newMatchesToSave: ClubSpecificMatch[] = data.matches.map(m => ({
+        id: m.id || crypto.randomUUID(), // Ensure ID exists
+        description: m.description,
+    }));
+
+    saveClubDefinedMatches(clubId, newMatchesToSave);
     toast({
-      title: "Configuración Guardada",
-      description: "Los días y horarios disponibles para el formulario de tu club han sido actualizados.",
+      title: "Partidos Guardados",
+      description: "La lista de partidos/turnos disponibles para tu club ha sido actualizada.",
     });
   }
+
+  const addNewMatchField = () => {
+    append({ id: crypto.randomUUID(), description: "" });
+  };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-8">
         <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-        Cargando configuración del formulario...
+        Cargando partidos del club...
       </div>
     );
   }
@@ -89,121 +99,75 @@ export default function FormConfigEditor({ clubId }: FormConfigEditorProps) {
     <Card className="shadow-lg">
       <CardHeader>
         <CardTitle className="text-2xl font-headline flex items-center gap-2">
-          <Settings2 size={28} className="text-primary" />
-          Configurar Formulario de Disponibilidad del Club
+          <CalendarPlus size={28} className="text-primary" />
+          Definir Partidos/Turnos del Club
         </CardTitle>
         <CardDescription>
-          Selecciona los días y horarios que los árbitros de tu club podrán elegir al enviar su disponibilidad.
+          Crea, edita o elimina los partidos o bloques de turno específicos a los que los árbitros de tu club podrán postularse.
+          Ejemplo: "Sábado 10:00 - Cancha 1: Sub-15", "Domingo Completo - Torneo Adultos".
         </CardDescription>
       </CardHeader>
       <CardContent>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-            <FormField
-              control={form.control}
-              name="configuredDays"
-              render={() => (
-                <FormItem>
-                  <div className="mb-4">
-                    <FormLabel className="text-lg font-semibold flex items-center gap-2"><CalendarDays className="text-primary"/>Días Habilitados</FormLabel>
-                    <FormDescription>
-                      Marca los días de la semana que estarán disponibles en el formulario para tu club.
-                    </FormDescription>
-                  </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
-                    {DAYS_OF_WEEK.map((day) => (
-                      <FormField
-                        key={`config-day-${day}`}
-                        control={form.control}
-                        name="configuredDays"
-                        render={({ field }) => {
-                          return (
-                            <FormItem
-                              key={day}
-                              className="flex flex-row items-center space-x-3 space-y-0 p-2 bg-muted/30 rounded-md border"
-                            >
-                              <FormControl>
-                                <Checkbox
-                                  checked={field.value?.includes(day)}
-                                  onCheckedChange={(checked) => {
-                                    return checked
-                                      ? field.onChange([...(field.value || []), day])
-                                      : field.onChange(
-                                          (field.value || []).filter(
-                                            (value) => value !== day
-                                          )
-                                        );
-                                  }}
-                                />
-                              </FormControl>
-                              <FormLabel className="font-normal text-sm">
-                                {day}
-                              </FormLabel>
-                            </FormItem>
-                          );
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="configuredTimeSlots"
-              render={() => (
-                <FormItem>
-                  <div className="mb-4">
-                    <FormLabel className="text-lg font-semibold flex items-center gap-2"><Clock className="text-primary"/>Horarios Habilitados</FormLabel>
-                    <FormDescription>
-                      Marca los bloques horarios que estarán disponibles en el formulario para tu club.
-                    </FormDescription>
-                  </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {TIME_SLOTS.map((time) => (
-                    <FormField
-                      key={`config-time-${time}`}
-                      control={form.control}
-                      name="configuredTimeSlots"
-                      render={({ field }) => {
-                        return (
-                          <FormItem
-                            key={time}
-                            className="flex flex-row items-center space-x-3 space-y-0 p-2 bg-muted/30 rounded-md border"
+            {fields.length > 0 && (
+              <div className="space-y-4">
+                {fields.map((field, index) => (
+                  <FormField
+                    key={field.id} // use field.id which is managed by useFieldArray
+                    control={form.control}
+                    name={`matches.${index}.description`}
+                    render={({ field: inputField }) => (
+                      <FormItem>
+                        <FormLabel className="sr-only">Descripción del Partido {index + 1}</FormLabel>
+                        <div className="flex items-center gap-2">
+                          <FormControl>
+                            <Input 
+                              placeholder={`Descripción del Partido/Turno ${index + 1}`} 
+                              {...inputField} 
+                            />
+                          </FormControl>
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            onClick={() => remove(index)}
+                            aria-label="Eliminar partido"
                           >
-                            <FormControl>
-                              <Checkbox
-                                checked={field.value?.includes(time)}
-                                onCheckedChange={(checked) => {
-                                  return checked
-                                    ? field.onChange([...(field.value || []), time])
-                                    : field.onChange(
-                                        (field.value || []).filter(
-                                          (value) => value !== time
-                                        )
-                                      );
-                                }}
-                              />
-                            </FormControl>
-                            <FormLabel className="font-normal text-sm">
-                              {time}
-                            </FormLabel>
-                          </FormItem>
-                        );
-                      }}
-                    />
-                  ))}
-                  </div>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
-              <Save className="mr-2 h-4 w-4" />
-              Guardar Configuración del Club
-            </Button>
+                            <Trash2 size={18} />
+                          </Button>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ))}
+              </div>
+            )}
+             {fields.length === 0 && !isLoading && (
+                <p className="text-sm text-muted-foreground text-center py-4">
+                    No hay partidos definidos para este club. Añade el primero.
+                </p>
+            )}
+
+            <div className="flex flex-col sm:flex-row gap-2 items-center">
+                <Button
+                type="button"
+                variant="outline"
+                onClick={addNewMatchField}
+                className="w-full sm:w-auto"
+                >
+                <ListPlus className="mr-2 h-4 w-4" />
+                Añadir Nuevo Partido/Turno
+                </Button>
+                <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
+                <Save className="mr-2 h-4 w-4" />
+                Guardar Cambios en Partidos
+                </Button>
+            </div>
+            <FormDescription>
+                Los árbitros verán estas descripciones como opciones para seleccionar en el formulario de postulación.
+            </FormDescription>
           </form>
         </Form>
       </CardContent>
