@@ -1,28 +1,21 @@
 
-import type { ShiftRequest, User, Club, ClubSpecificMatch } from '@/types';
-// import { DAYS_OF_WEEK, TIME_SLOTS } from '@/types'; // Keep for potential use in match definition UI
+import type { ShiftRequest, User, Club, ClubSpecificMatch, MatchAssignment } from '@/types';
 
-const SHIFT_REQUESTS_KEY = 'arbitros_shift_requests_v4'; // Incremented version
-// const FORM_CONFIGURATIONS_KEY = 'arbitros_form_configurations_v2'; // Removed
-const CLUB_DEFINED_MATCHES_KEY = 'arbitros_club_defined_matches_v1'; // New key
+const SHIFT_REQUESTS_KEY = 'arbitros_shift_requests_v4';
+const CLUB_DEFINED_MATCHES_KEY = 'arbitros_club_defined_matches_v1';
 const USERS_KEY = 'arbitros_users_v3'; 
 const CLUBS_KEY = 'arbitros_clubs_v1';
 const CURRENT_USER_EMAIL_KEY = 'arbitros_current_user_email_v2';
 const ACTIVE_CLUB_ID_KEY = 'arbitros_active_club_id_v1'; 
-const TEST_DATA_INITIALIZED_KEY = 'arbitros_test_data_initialized_v2'; // Incremented version
-
-// DEFAULT_FORM_CONFIGURATION is removed as FormConfiguration is removed.
-// export const DEFAULT_FORM_CONFIGURATION: FormConfiguration = {
-//   availableDays: [...DAYS_OF_WEEK],
-//   availableTimeSlots: [...TIME_SLOTS],
-// };
+const MATCH_ASSIGNMENTS_KEY = 'arbitros_match_assignments_v1'; // New key for assignments
+const TEST_DATA_INITIALIZED_KEY = 'arbitros_test_data_initialized_v3'; // Incremented version for new data structure
 
 function initializeWithTestData() {
   if (typeof window === 'undefined' || localStorage.getItem(TEST_DATA_INITIALIZED_KEY)) {
     return;
   }
 
-  console.log("Initializing with V2 test data (specific matches)...");
+  console.log("Initializing with V3 test data (match assignments)...");
 
   const club1Id = "club-bh-01";
   const club2Id = "club-rs-02";
@@ -42,27 +35,25 @@ function initializeWithTestData() {
   ];
   setItem(USERS_KEY, users);
 
-  // --- Club Defined Matches ---
-  const clubMatches: Record<string, ClubSpecificMatch[]> = {
+  const clubMatchesData: Record<string, ClubSpecificMatch[]> = {
     [club1Id]: [
-      { id: crypto.randomUUID(), description: "Sábado 15:00 - Cancha Principal - Final Liga A" },
-      { id: crypto.randomUUID(), description: "Sábado 17:00 - Cancha Principal - Final Liga B" },
-      { id: crypto.randomUUID(), description: "Domingo 10:00 - Cancha Auxiliar - Sub-17" },
+      { id: "match_bh_001", description: "Sábado 15:00 - Cancha Principal - Final Liga A" },
+      { id: "match_bh_002", description: "Sábado 17:00 - Cancha Principal - Final Liga B" },
+      { id: "match_bh_003", description: "Domingo 10:00 - Cancha Auxiliar - Sub-17" },
     ],
     [club2Id]: [
-      { id: crypto.randomUUID(), description: "Viernes 20:00 - Polideportivo - Futsal Mayor A" },
-      { id: crypto.randomUUID(), description: "Viernes 21:30 - Polideportivo - Futsal Mayor B" },
+      { id: "match_rs_001", description: "Viernes 20:00 - Polideportivo - Futsal Mayor A" },
+      { id: "match_rs_002", description: "Viernes 21:30 - Polideportivo - Futsal Mayor B" },
     ],
   };
-  setItem(CLUB_DEFINED_MATCHES_KEY, clubMatches);
+  setItem(CLUB_DEFINED_MATCHES_KEY, clubMatchesData);
 
-  // --- Solicitudes de Turno (ahora con selectedMatches) ---
   const shiftRequests: ShiftRequest[] = [
     { 
       id: crypto.randomUUID(), 
       userEmail: "ref1@example.com", 
       clubId: club1Id, 
-      selectedMatches: [clubMatches[club1Id][0], clubMatches[club1Id][2]], // Postulado a Sábado y Domingo
+      selectedMatches: [clubMatchesData[club1Id][0], clubMatchesData[club1Id][2]], 
       hasCar: true, 
       notes: "Prefiero el de la mañana del domingo si es posible.", 
       status: 'pending', 
@@ -70,30 +61,41 @@ function initializeWithTestData() {
     },
     { 
       id: crypto.randomUUID(), 
-      userEmail: "ref3@example.com", 
-      clubId: club2Id, 
-      selectedMatches: [clubMatches[club2Id][1]], // Postulado a Viernes 21:30
-      hasCar: true, 
-      notes: "", 
-      status: 'assigned', 
-      assignedRefereeName: "Referee Tres (Rosales)",
-      submittedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
-    },
-     { 
-      id: crypto.randomUUID(), 
-      userEmail: "refMulti@example.com", 
-      clubId: club1Id,
-      selectedMatches: [clubMatches[club1Id][1]], // Postulado a Sábado 17:00 Bahía
+      userEmail: "refUserMulti@example.com", // MultiClub user applied for a Bahia match
+      clubId: club1Id, 
+      selectedMatches: [clubMatchesData[club1Id][0]], // Applied for the same match as ref1
       hasCar: false, 
-      notes: "Postulación para Club Bahiense.", 
+      notes: "También disponible para Final Liga A en Bahía.", 
       status: 'pending', 
       submittedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+    },
+    { 
+      id: crypto.randomUUID(), 
+      userEmail: "ref3@example.com", 
+      clubId: club2Id, 
+      selectedMatches: [clubMatchesData[club2Id][1]], 
+      hasCar: true, 
+      notes: "", 
+      status: 'pending', // Status changed to pending, assignment will be separate
+      submittedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
     },
   ];
   setItem(SHIFT_REQUESTS_KEY, shiftRequests);
 
+  // Initialize empty match assignments
+  const matchAssignments: MatchAssignment[] = [
+    // Example: Assign ref3 to one of their postulated matches
+    // {
+    //   clubId: club2Id,
+    //   matchId: clubMatchesData[club2Id][1].id, // Viernes 21:30
+    //   assignedRefereeEmail: "ref3@example.com",
+    //   assignedAt: new Date().toISOString(),
+    // }
+  ];
+  setItem(MATCH_ASSIGNMENTS_KEY, matchAssignments);
+
   localStorage.setItem(TEST_DATA_INITIALIZED_KEY, 'true');
-  console.log("Test data V2 (specific matches) initialized.");
+  console.log("Test data V3 (match assignments) initialized.");
 }
 
 
@@ -101,12 +103,12 @@ function getItem<T>(key: string, defaultValue: T): T {
   if (typeof window === 'undefined') {
     return defaultValue;
   }
-  if (key === USERS_KEY && !localStorage.getItem(USERS_KEY)) initializeWithTestData();
-  if (key === CLUBS_KEY && !localStorage.getItem(CLUBS_KEY)) initializeWithTestData();
-  if (key === SHIFT_REQUESTS_KEY && !localStorage.getItem(SHIFT_REQUESTS_KEY)) initializeWithTestData();
-  // if (key === FORM_CONFIGURATIONS_KEY && !localStorage.getItem(FORM_CONFIGURATIONS_KEY)) initializeWithTestData(); // Removed
-  if (key === CLUB_DEFINED_MATCHES_KEY && !localStorage.getItem(CLUB_DEFINED_MATCHES_KEY)) initializeWithTestData();
-
+  // Initialize if main data keys are missing
+  if (!localStorage.getItem(TEST_DATA_INITIALIZED_KEY)) {
+    if (key === USERS_KEY || key === CLUBS_KEY || key === SHIFT_REQUESTS_KEY || key === CLUB_DEFINED_MATCHES_KEY || key === MATCH_ASSIGNMENTS_KEY) {
+        initializeWithTestData();
+    }
+  }
 
   try {
     const data = localStorage.getItem(key);
@@ -144,7 +146,6 @@ export const addClub = (name: string, adminUserId: string): Club => {
   const newClubId = `club-${name.toLowerCase().replace(/\s+/g, '-').slice(0,10)}-${crypto.randomUUID().slice(0,4)}`;
   const newClub: Club = { id: newClubId, name, adminUserId };
   saveClubs([...clubs, newClub]);
-  // Initialize empty matches for the new club
   const allClubMatches = getClubDefinedMatchesAllClubs();
   allClubMatches[newClubId] = [];
   saveClubDefinedMatchesAllClubs(allClubMatches);
@@ -168,14 +169,24 @@ export const addUser = (
     newUser = { id: userId, name: userData.name, email: userData.email, password: userData.password, role: 'admin', administeredClubId: newClub.id };
   } else { 
     if (!userData.clubIdToJoin) return { error: "El código de club es requerido para árbitros." };
-    const clubExists = findClubById(userData.clubIdToJoin);
-    if (!clubExists) return { error: "El código de club no es válido o el club no existe." };
-    const existingUser = users.find(u => u.email === userData.email);
-    if(existingUser?.memberClubIds?.includes(userData.clubIdToJoin)) return { error: "Ya eres miembro de este club."};
+    const clubToJoin = findClubById(userData.clubIdToJoin);
+    if (!clubToJoin) return { error: "El código de club no es válido o el club no existe." };
     
-    newUser = { id: userId, name: userData.name, email: userData.email, password: userData.password, role: 'referee', memberClubIds: [userData.clubIdToJoin] };
+    // Check if user already exists with this email to add new clubId, or create new user
+    const existingUserIndex = users.findIndex(u => u.email === userData.email);
+    if (existingUserIndex > -1) { // User exists, add clubId if not already a member
+        const existingUser = users[existingUserIndex];
+        if (existingUser.role !== 'referee') return { error: "Este email ya está registrado con un rol diferente."};
+        if (existingUser.memberClubIds?.includes(userData.clubIdToJoin)) return { error: "Ya eres miembro de este club."};
+        existingUser.memberClubIds = [...(existingUser.memberClubIds || []), userData.clubIdToJoin];
+        users[existingUserIndex] = existingUser;
+        newUser = existingUser;
+    } else { // New user
+        newUser = { id: userId, name: userData.name, email: userData.email, password: userData.password, role: 'referee', memberClubIds: [userData.clubIdToJoin] };
+        users.push(newUser);
+    }
   }
-  saveUsers([...users, newUser]);
+  saveUsers(users);
   return { user: newUser, club: newClub };
 };
 export const findUserByEmail = (email: string): User | undefined => getUsers().find(user => user.email === email);
@@ -230,35 +241,85 @@ export const updateShiftRequestDetails = (
   saveShiftRequests(requests);
   return updatedRequest;
 };
-export const updateShiftRequestStatus = (id: string, status: ShiftRequest['status'], assignedRefereeName?: string): ShiftRequest | null => {
+// updateShiftRequestStatus now only handles 'pending' and 'completed'. 'assigned' is handled by MatchAssignments
+export const updateShiftRequestStatus = (id: string, status: 'pending' | 'completed'): ShiftRequest | null => {
   const requests = getItem<ShiftRequest[]>(SHIFT_REQUESTS_KEY, []);
   const requestIndex = requests.findIndex(req => req.id === id);
   if (requestIndex === -1) return null;
-  const updatedRequest = { ...requests[requestIndex], status };
-  if (status === 'assigned' && assignedRefereeName) updatedRequest.assignedRefereeName = assignedRefereeName;
-  else if (status !== 'assigned') delete updatedRequest.assignedRefereeName;
-  requests[requestIndex] = updatedRequest;
+  requests[requestIndex].status = status;
+  // requests[requestIndex].assignedRefereeName = undefined; // Ensure this is cleared if changing from an old 'assigned'
   saveShiftRequests(requests);
-  return updatedRequest;
+  return requests[requestIndex];
 };
 
-// Club Specific Matches Management
 export const getClubDefinedMatchesAllClubs = (): Record<string, ClubSpecificMatch[]> => {
   return getItem(CLUB_DEFINED_MATCHES_KEY, {});
 };
-
 export const getClubDefinedMatches = (clubId: string): ClubSpecificMatch[] => {
   const allMatches = getClubDefinedMatchesAllClubs();
   return allMatches[clubId] || [];
 };
-
 export const saveClubDefinedMatches = (clubId: string, matches: ClubSpecificMatch[]): void => {
   const allMatches = getClubDefinedMatchesAllClubs();
   allMatches[clubId] = matches;
   setItem(CLUB_DEFINED_MATCHES_KEY, allMatches);
 };
-
-// Helper to save all club matches (used internally, e.g. when adding a new club)
 function saveClubDefinedMatchesAllClubs(allClubMatches: Record<string, ClubSpecificMatch[]>): void {
   setItem(CLUB_DEFINED_MATCHES_KEY, allClubMatches);
 }
+
+// Match Assignment Functions
+export const getMatchAssignments = (): MatchAssignment[] => {
+  return getItem<MatchAssignment[]>(MATCH_ASSIGNMENTS_KEY, []);
+};
+export const saveMatchAssignments = (assignments: MatchAssignment[]): void => {
+  setItem(MATCH_ASSIGNMENTS_KEY, assignments);
+};
+
+export const getAssignmentForMatch = (clubId: string, matchId: string): MatchAssignment | undefined => {
+  return getMatchAssignments().find(a => a.clubId === clubId && a.matchId === matchId);
+};
+
+export const assignRefereeToMatch = (clubId: string, matchId: string, assignedRefereeEmail: string): MatchAssignment => {
+  let assignments = getMatchAssignments();
+  const existingAssignmentIndex = assignments.findIndex(a => a.clubId === clubId && a.matchId === matchId);
+  const newAssignment: MatchAssignment = { 
+    clubId, 
+    matchId, 
+    assignedRefereeEmail, 
+    assignedAt: new Date().toISOString() 
+  };
+  if (existingAssignmentIndex > -1) {
+    assignments[existingAssignmentIndex] = newAssignment;
+  } else {
+    assignments.push(newAssignment);
+  }
+  saveMatchAssignments(assignments);
+  return newAssignment;
+};
+
+export const unassignRefereeFromMatch = (clubId: string, matchId: string): void => {
+  let assignments = getMatchAssignments();
+  assignments = assignments.filter(a => !(a.clubId === clubId && a.matchId === matchId));
+  saveMatchAssignments(assignments);
+};
+
+export const getRefereesPostulatedForMatch = (clubId: string, matchId: string): User[] => {
+  const shiftRequestsForClub = getShiftRequests(clubId);
+  const emails: string[] = [];
+  shiftRequestsForClub.forEach(req => {
+    if (req.selectedMatches.some(match => match.id === matchId)) {
+      if (!emails.includes(req.userEmail)) {
+        emails.push(req.userEmail);
+      }
+    }
+  });
+  const users = getUsers();
+  return emails.map(email => users.find(u => u.email === email)).filter(Boolean) as User[];
+};
+
+export const getRefereeNameByEmail = (email: string): string | undefined => {
+  const user = findUserByEmail(email);
+  return user?.name;
+}
+
