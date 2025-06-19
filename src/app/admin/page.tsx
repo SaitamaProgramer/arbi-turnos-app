@@ -3,8 +3,7 @@
 
 import { useEffect, useState } from "react";
 import ShiftTable from "@/components/admin/shift-table";
-// import FormConfigEditor from "@/components/admin/form-config-editor"; // Renamed/Replaced
-import ClubMatchManager from "@/components/admin/form-config-editor"; // Using the new component
+import ClubMatchManager from "@/components/admin/form-config-editor"; 
 import AdminDashboard from "@/components/admin/admin-dashboard";
 import { 
   getShiftRequests, 
@@ -14,9 +13,10 @@ import {
   getRefereesByClubId,
   getActiveClubId,
   setActiveClubId,
-  // getFormConfiguration, // No longer used directly here for configuration
+  getClubDefinedMatches, // Added
+  getMatchAssignments,  // Added
 } from "@/lib/localStorage";
-import type { ShiftRequest, User, Club } from "@/types";
+import type { ShiftRequest, User, Club, ClubSpecificMatch, MatchAssignment } from "@/types"; // Added ClubSpecificMatch, MatchAssignment
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClipboardList, Settings, Loader2, ShieldAlert, Info, Copy, LayoutDashboard, CalendarPlus } from "lucide-react";
@@ -30,6 +30,9 @@ export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentClub, setCurrentClub] = useState<Club | null>(null);
   const [refereesInClub, setRefereesInClub] = useState<User[]>([]);
+  const [clubDefinedMatches, setClubDefinedMatches] = useState<ClubSpecificMatch[]>([]); // Added
+  const [matchAssignments, setMatchAssignments] = useState<MatchAssignment[]>([]); // Added
+
   const router = useRouter();
   const { toast } = useToast();
 
@@ -44,16 +47,18 @@ export default function AdminPage() {
 
     if (user && user.role === 'admin' && user.administeredClubId) {
       const adminClubId = user.administeredClubId;
-      const activeRefereeClub = getActiveClubId();
-      if (activeRefereeClub && activeRefereeClub !== adminClubId) {
+      // Ensure active club is the admin's club
+      if (getActiveClubId() !== adminClubId) {
           setActiveClubId(adminClubId); 
       }
 
       const club = findClubById(adminClubId);
       if (club) {
         setCurrentClub(club);
-        setRequests(getShiftRequests(club.id));
+        setRequests(getShiftRequests(club.id)); // Shift requests for this admin's club
         setRefereesInClub(getRefereesByClubId(club.id));
+        setClubDefinedMatches(getClubDefinedMatches(club.id)); // Matches defined for this club
+        setMatchAssignments(getMatchAssignments().filter(a => a.clubId === club.id)); // Assignments for this club
       } else {
          toast({ title: "Error de Club", description: "No se pudo encontrar el club que administras.", variant: "destructive" });
          router.push('/login'); 
@@ -80,13 +85,6 @@ export default function AdminPage() {
     setIsLoading(false);
   }, [router, toast]);
 
-  const handleUpdateRequest = (updatedRequest: ShiftRequest) => {
-    if (!currentClub) return;
-    const updatedRequests = requests.map(req => 
-      req.id === updatedRequest.id ? updatedRequest : req
-    );
-    setRequests(updatedRequests);
-  };
 
   const copyClubId = () => {
     if (currentClub?.id) {
@@ -99,6 +97,16 @@ export default function AdminPage() {
         });
     }
   };
+
+  // Callback to refresh club-defined matches if ClubMatchManager updates them
+  const refreshClubMatches = () => {
+    if (currentClub) {
+      setClubDefinedMatches(getClubDefinedMatches(currentClub.id));
+    }
+  };
+  
+  // Callback to refresh assignments if ShiftTable updates them (passed down to ShiftTable)
+  // This is implicitly handled by assignmentVersion state within ShiftTable now.
 
   if (isLoading || !currentUser) { 
     return (
@@ -147,10 +155,10 @@ export default function AdminPage() {
                <TabsTrigger value="dashboard">
                 <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
               </TabsTrigger>
-              <TabsTrigger value="shifts">
-                <ClipboardList className="mr-2 h-4 w-4" /> Gestionar Postulaciones
+              <TabsTrigger value="assignments"> {/* Renamed from 'shifts' */}
+                <ClipboardList className="mr-2 h-4 w-4" /> Gestionar Asignaciones
               </TabsTrigger>
-              <TabsTrigger value="match-manager"> {/* Changed value and text */}
+              <TabsTrigger value="match-manager"> 
                 <CalendarPlus className="mr-2 h-4 w-4" /> Definir Partidos/Turnos
               </TabsTrigger>
                <TabsTrigger value="club-info">
@@ -161,14 +169,20 @@ export default function AdminPage() {
               <AdminDashboard 
                 clubId={currentClub.id} 
                 allRefereesInClub={refereesInClub}
-                shiftRequestsForClub={requests}
+                shiftRequestsForClub={requests} // Pass all requests for dashboard stats
               />
             </TabsContent>
-            <TabsContent value="shifts">
-              <ShiftTable requests={requests} onUpdateRequest={handleUpdateRequest} clubId={currentClub.id} />
+            <TabsContent value="assignments"> {/* Renamed from 'shifts' */}
+              <ShiftTable 
+                clubId={currentClub.id}
+                definedMatchesForClub={clubDefinedMatches}
+                allShiftRequestsForClub={requests}
+                allClubReferees={refereesInClub}
+                initialMatchAssignments={matchAssignments}
+              />
             </TabsContent>
-            <TabsContent value="match-manager"> {/* Changed value */}
-              <ClubMatchManager clubId={currentClub.id} />
+            <TabsContent value="match-manager"> 
+              <ClubMatchManager clubId={currentClub.id} onMatchesUpdated={refreshClubMatches} />
             </TabsContent>
             <TabsContent value="club-info">
               <Card>

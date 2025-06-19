@@ -20,7 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { getClubDefinedMatches, saveClubDefinedMatches } from "@/lib/localStorage";
 import type { ClubSpecificMatch } from "@/types";
 import { useEffect, useState } from "react";
-import { Save, Settings2, ListPlus, Trash2, Loader2, CalendarPlus } from "lucide-react";
+import { Save, ListPlus, Trash2, Loader2, CalendarPlus } from "lucide-react";
 
 const matchSchema = z.object({
   id: z.string(),
@@ -35,9 +35,10 @@ type ClubMatchesFormValues = z.infer<typeof clubMatchesFormSchema>;
 
 interface ClubMatchManagerProps {
   clubId: string;
+  onMatchesUpdated?: () => void; // Optional callback
 }
 
-export default function ClubMatchManager({ clubId }: ClubMatchManagerProps) {
+export default function ClubMatchManager({ clubId, onMatchesUpdated }: ClubMatchManagerProps) {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(true);
   
@@ -69,9 +70,8 @@ export default function ClubMatchManager({ clubId }: ClubMatchManagerProps) {
       toast({ title: "Error", description: "No se pudo identificar el club.", variant: "destructive" });
       return;
     }
-    // Ensure new matches get a unique ID if they don't have one (though append should handle it)
     const newMatchesToSave: ClubSpecificMatch[] = data.matches.map(m => ({
-        id: m.id || crypto.randomUUID(), // Ensure ID exists
+        id: m.id || crypto.randomUUID(), 
         description: m.description,
     }));
 
@@ -80,6 +80,7 @@ export default function ClubMatchManager({ clubId }: ClubMatchManagerProps) {
       title: "Partidos Guardados",
       description: "La lista de partidos/turnos disponibles para tu club ha sido actualizada.",
     });
+    onMatchesUpdated?.(); // Call the callback if provided
   }
 
   const addNewMatchField = () => {
@@ -114,7 +115,7 @@ export default function ClubMatchManager({ clubId }: ClubMatchManagerProps) {
               <div className="space-y-4">
                 {fields.map((field, index) => (
                   <FormField
-                    key={field.id} // use field.id which is managed by useFieldArray
+                    key={field.id} 
                     control={form.control}
                     name={`matches.${index}.description`}
                     render={({ field: inputField }) => (
