@@ -22,8 +22,7 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
+} from "@/components/ui/alert-dialog"; // Removed AlertDialogTrigger as it's not directly used in the fixed code for the trigger button
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { 
@@ -33,9 +32,10 @@ import {
   unassignRefereeFromMatch,
   getRefereesPostulatedForMatch,
   getRefereeNameByEmail,
-  getRefereesByClubId
+  getRefereesByClubId,
+  getMatchAssignments // Added import
 } from "@/lib/localStorage"; 
-import { UserCheck, CheckCircle2, UserPlus, BadgeCheck, Hourglass, Mail, ListChecks, Users, Trash2, Edit } from "lucide-react";
+import { UserCheck, CheckCircle2, UserPlus, BadgeCheck, Hourglass, Mail, ListChecks, Trash2, Edit } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -60,6 +60,11 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
   const [assignDialogState, setAssignDialogState] = useState<AssignDialogState>({ open: false, match: null, shiftRequestUserEmail: "" });
   const [selectedRefereeForAssignment, setSelectedRefereeForAssignment] = useState<string>("");
   const [postulatedRefereesForDialog, setPostulatedRefereesForDialog] = useState<User[]>([]);
+  
+  // State to force re-render after assignment/unassignment.
+  // Incrementing this will trigger useEffects or re-calculations that depend on assignments.
+  const [assignmentVersion, setAssignmentVersion] = useState(0);
+
 
   useEffect(() => {
     const clubRequests = requests.filter(req => req.clubId === clubId);
@@ -68,8 +73,7 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
     setAllClubReferees(getRefereesByClubId(clubId));
   }, [requests, clubId]);
   
-  // Memoized assignments fetching
-  const matchAssignments = getMatchAssignments(); // Get all once, filter as needed or make getAssignmentForMatch efficient
+  const matchAssignments = getMatchAssignments(); 
 
   const getAssignment = useCallback((matchId: string): MatchAssignment | undefined => {
     return matchAssignments.find(a => a.clubId === clubId && a.matchId === matchId);
@@ -81,17 +85,31 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
     const postulated = getRefereesPostulatedForMatch(clubId, match.id);
     
     let availableReferees = postulated.length > 0 ? postulated : allClubReferees;
-    if (postulated.length === 0 && allClubReferees.length === 0) {
-      availableReferees = []; // No one to assign
+    // If the current assigned referee is not in the postulated list (e.g., admin assigned manually from all club refs), add them.
+    if (assignment?.assignedRefereeEmail) {
+        const assignedUserInList = availableReferees.find(u => u.email === assignment.assignedRefereeEmail);
+        if (!assignedUserInList) {
+            const assignedUserDetails = allClubReferees.find(u => u.email === assignment.assignedRefereeEmail);
+            if (assignedUserDetails) {
+                availableReferees = [assignedUserDetails, ...availableReferees.filter(u => u.email !== assignment.assignedRefereeEmail)];
+            }
+        }
+    }
+
+
+    if (availableReferees.length === 0 && !assignment?.assignedRefereeEmail) {
+       toast({ title: "Sin Árbitros", description: "No hay árbitros postulados ni disponibles en el club para este partido.", variant: "destructive"});
+       return;
     }
     
     setPostulatedRefereesForDialog(availableReferees);
     setAssignDialogState({
       open: true,
       match: match,
-      shiftRequestUserEmail: shiftRequest.userEmail,
+      shiftRequestUserEmail: shiftRequest.userEmail, // Not strictly needed anymore with match-centric assignment but kept for now
       currentAssignedEmail: assignment?.assignedRefereeEmail,
     });
+    // Pre-select the currently assigned referee in the dialog, or the first available, or nothing if no one is available
     setSelectedRefereeForAssignment(assignment?.assignedRefereeEmail || (availableReferees.length > 0 ? availableReferees[0].email : ""));
   };
 
@@ -107,8 +125,7 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
     });
     setAssignDialogState({ open: false, match: null, shiftRequestUserEmail: "" });
     setSelectedRefereeForAssignment("");
-    // Force re-render or state update to show new assignment
-    // This might require a more direct state update or re-fetching assignments if not automatically reflecting
+    setAssignmentVersion(v => v + 1); // Force re-render
   };
   
   const handleUnassignShift = (matchId: string) => {
@@ -119,7 +136,7 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
       description: `El árbitro ha sido desasignado de ${match?.description || 'este partido'}.`,
       variant: "default"
     });
-     // Force re-render or state update
+    setAssignmentVersion(v => v + 1); // Force re-render
   }
 
   const handleMarkRequestAsCompleted = (id: string) => {
@@ -153,7 +170,7 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
   return (
     <div className="rounded-lg border shadow-sm overflow-hidden bg-card">
       <Table>
-        <TableCaption>Lista de postulaciones de árbitros. Mostrando {displayRequests.length} postulaciones.</TableCaption>
+        <TableCaption>Lista de postulaciones de árbitros. Mostrando {displayRequests.length} postulaciones. Las asignaciones son por partido individual.</TableCaption>
         <TableHeader>
           <TableRow>
             <TableHead className="font-headline w-[150px]"><Mail className="inline mr-1 h-4 w-4 text-primary" />Email Postulante</TableHead>
@@ -168,7 +185,7 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
         <TableBody>
           {displayRequests.map((request) => (
             <TableRow key={request.id}>
-              <TableCell className="text-xs font-medium">{request.userEmail}</TableCell>
+              <TableCell className="text-xs font-medium">{request.userEmail} ({getRefereeNameByEmail(request.userEmail)})</TableCell>
               <TableCell>
                 {request.selectedMatches.length > 0 ? (
                   <ul className="space-y-3">
@@ -176,23 +193,23 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
                       const assignment = getAssignment(matchItem.id);
                       const assignedRefereeName = assignment ? (getRefereeNameByEmail(assignment.assignedRefereeEmail) || assignment.assignedRefereeEmail) : null;
                       return (
-                        <li key={matchItem.id} className="py-1 border-b border-dashed border-border last:border-b-0">
-                          <div className="flex justify-between items-center">
-                            <span className="text-sm">{matchItem.description}</span>
+                        <li key={matchItem.id} className="py-2 border-b border-dashed border-border last:border-b-0">
+                          <div className="flex justify-between items-center gap-2">
+                            <span className="text-sm font-medium">{matchItem.description}</span>
                             {assignment ? (
                               <div className="flex items-center gap-2">
-                                <Badge variant="default" className="bg-blue-100 text-blue-800 border-blue-300 text-xs">
-                                  <UserCheck className="mr-1 h-3 w-3" /> Asignado a: {assignedRefereeName}
+                                <Badge variant="default" className="bg-blue-100 text-blue-800 border-blue-300 text-xs whitespace-nowrap">
+                                  <UserCheck className="mr-1 h-3 w-3" /> Asignado: {assignedRefereeName}
                                 </Badge>
-                                <Button variant="outline" size="sm" onClick={() => openAssignDialog(matchItem, request)} className="h-7 px-2 py-1 text-xs">
+                                <Button variant="outline" size="sm" onClick={() => openAssignDialog(matchItem, request)} className="h-7 px-2 py-1 text-xs whitespace-nowrap">
                                   <Edit size={12} className="mr-1"/> Reasignar
                                 </Button>
-                                <Button variant="ghost" size="sm" onClick={() => handleUnassignShift(matchItem.id)} className="h-7 px-2 py-1 text-xs text-destructive hover:bg-destructive/10">
+                                <Button variant="ghost" size="sm" onClick={() => handleUnassignShift(matchItem.id)} className="h-7 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 whitespace-nowrap">
                                   <Trash2 size={12} className="mr-1"/> Quitar
                                 </Button>
                               </div>
                             ) : (
-                              <Button variant="outline" size="sm" onClick={() => openAssignDialog(matchItem, request)} className="h-7 px-2 py-1 text-xs border-primary text-primary hover:bg-primary/10">
+                              <Button variant="outline" size="sm" onClick={() => openAssignDialog(matchItem, request)} className="h-7 px-2 py-1 text-xs border-primary text-primary hover:bg-primary/10 whitespace-nowrap">
                                 <UserPlus className="mr-1 h-3 w-3" /> Asignar Árbitro
                               </Button>
                             )}
@@ -212,7 +229,7 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
                 }
               </TableCell>
               <TableCell className="max-w-[200px] break-words text-xs">{request.notes || "-"}</TableCell>
-              <TableCell className="text-xs">{format(new Date(request.submittedAt), "dd/MM/yy HH:mm", { locale: es })}</TableCell>
+              <TableCell className="text-xs whitespace-nowrap">{format(new Date(request.submittedAt), "dd/MM/yy HH:mm", { locale: es })}</TableCell>
               <TableCell>{getRequestStatusBadge(request.status)}</TableCell>
               <TableCell className="text-right">
                 {request.status === "pending" && (
@@ -230,18 +247,26 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
       </Table>
 
       {assignDialogState.open && assignDialogState.match && (
-        <AlertDialog open={assignDialogState.open} onOpenChange={(open) => !open && setAssignDialogState({ open: false, match: null, shiftRequestUserEmail: "" })}>
+        <AlertDialog open={assignDialogState.open} onOpenChange={(open) => {
+            if (!open) {
+                setAssignDialogState({ open: false, match: null, shiftRequestUserEmail: "" });
+                setSelectedRefereeForAssignment("");
+            }
+        }}>
           <AlertDialogContent>
             <AlertDialogHeader>
               <AlertDialogTitle>Asignar Árbitro para: {assignDialogState.match.description}</AlertDialogTitle>
               <AlertDialogDescription>
                 Selecciona un árbitro para asignar a este partido/turno. 
-                {postulatedRefereesForDialog.length > 0 ? " Mostrando árbitros postulados o todos los del club." : " No hay árbitros postulados directamente, mostrando todos los del club."}
+                {postulatedRefereesForDialog.length > 0 ? " Se priorizan árbitros postulados, luego todos los del club." : " No hay árbitros postulados directamente, mostrando todos los del club."}
                  {assignDialogState.currentAssignedEmail && ` Actualmente asignado a: ${getRefereeNameByEmail(assignDialogState.currentAssignedEmail) || assignDialogState.currentAssignedEmail}.`}
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="py-4">
-              <Select onValueChange={setSelectedRefereeForAssignment} value={selectedRefereeForAssignment}>
+              <Select 
+                onValueChange={setSelectedRefereeForAssignment} 
+                value={selectedRefereeForAssignment}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecciona un árbitro" />
                 </SelectTrigger>
@@ -249,7 +274,7 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
                   {postulatedRefereesForDialog.length > 0 ? (
                     postulatedRefereesForDialog.map(referee => (
                       <SelectItem key={referee.id} value={referee.email}>
-                        {referee.name} ({referee.email})
+                        {referee.name} ({referee.email}) {getRefereesPostulatedForMatch(clubId, assignDialogState.match!.id).some(pr => pr.email === referee.email) ? ' (Postulado)' : ''}
                       </SelectItem>
                     ))
                   ) : allClubReferees.length > 0 ? (
@@ -265,8 +290,13 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
               </Select>
             </div>
             <AlertDialogFooter>
-              <AlertDialogCancel onClick={() => { setAssignDialogState({ open: false, match: null, shiftRequestUserEmail: "" }); setSelectedRefereeForAssignment(""); }}>Cancelar</AlertDialogCancel>
-              <AlertDialogAction onClick={handleAssignShift} className="bg-primary hover:bg-primary/90" disabled={!selectedRefereeForAssignment || selectedRefereeForAssignment === "no-referees"}>Confirmar Asignación</AlertDialogAction>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction 
+                onClick={handleAssignShift} 
+                className="bg-primary hover:bg-primary/90" 
+                disabled={!selectedRefereeForAssignment || selectedRefereeForAssignment === "no-referees"}>
+                Confirmar Asignación
+              </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>
         </AlertDialog>
@@ -274,3 +304,4 @@ export default function ShiftTable({ requests, onUpdateRequest, clubId }: ShiftT
     </div>
   );
 }
+
