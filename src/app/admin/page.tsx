@@ -56,7 +56,8 @@ export default function AdminPage() {
         setCurrentClub(club);
         setRequests(getShiftRequests(club.id)); 
         setRefereesInClub(getRefereesByClubId(club.id));
-        setClubDefinedMatches(getClubDefinedMatches(club.id)); 
+        const definedMatches = getClubDefinedMatches(club.id);
+        setClubDefinedMatches(definedMatches);
         setMatchAssignments(getMatchAssignments().filter(a => a.clubId === club.id)); 
       } else {
          toast({ title: "Error de Club", description: "No se pudo encontrar el club que administras.", variant: "destructive" });
@@ -147,7 +148,7 @@ export default function AdminPage() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="dashboard" className="w-full relative">
-            <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-4 mb-6 relative z-10">
+            <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-4 mb-6 relative z-10 [transform:translateZ(0px)]">
                <TabsTrigger value="dashboard">
                 <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
               </TabsTrigger>
@@ -208,3 +209,4 @@ export default function AdminPage() {
     </div>
   );
 }
+
