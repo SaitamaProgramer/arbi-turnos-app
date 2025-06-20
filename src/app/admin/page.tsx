@@ -148,7 +148,7 @@ export default function AdminPage() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="dashboard" className="w-full relative">
-            <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-4 mb-16 relative z-10 [transform:translateZ(0px)]">
+            <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-4 mb-20 relative z-10 [transform:translateZ(0px)]">
                <TabsTrigger value="dashboard">
                 <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
               </TabsTrigger>
