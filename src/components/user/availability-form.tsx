@@ -31,19 +31,21 @@ import {
   findPendingShiftRequestForUserInClub,
   updateShiftRequestDetails,
   getClubDefinedMatches,
-  isPostulationEditable, // Import the new helper
+  isPostulationEditable,
+  isMatchEditable, // Added import
 } from "@/lib/localStorage";
 import type { User, Club, ShiftRequest, ClubSpecificMatch } from "@/types";
 import { ListChecks, Car, ClipboardList, Send, Loader2, AlertTriangle, Users, Edit3, Info, FileText, CheckSquare, CalendarDays } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from 'date-fns';
+import { cn } from "@/lib/utils";
 
 const clubSpecificMatchSchema = z.object({
   id: z.string(),
   description: z.string(),
-  date: z.string(),
-  time: z.string(),
+  date: z.string(), // ISO string for date, e.g., "2024-07-28"
+  time: z.string(), // e.g., "15:00"
   location: z.string(),
 });
 
@@ -117,14 +119,11 @@ export default function AvailabilityForm() {
         });
         setIsEditing(true);
         setEditingRequestId(pendingRequest.id);
-        // Decide if summary or form should be shown initially
-        // If editable, show form. If not, show summary (or a specific message).
-        // For now, we always go to form if pending, summary is shown after submit.
       } else {
         form.reset({ selectedMatches: [], hasCar: undefined, notes: "", selectedClubId: clubId });
         setIsEditing(false);
         setEditingRequestId(null);
-        setCanEditCurrentPostulation(true); // No postulation, so "can edit" is true for a new one
+        setCanEditCurrentPostulation(true); 
       }
     } else {
       form.reset({ selectedMatches: [], hasCar: undefined, notes: "", selectedClubId: clubId });
@@ -171,11 +170,11 @@ export default function AvailabilityForm() {
         initialActiveClubId = userDetails.memberClubIds[0]; 
         setActiveClubId(initialActiveClubId);
       }
-      setCurrentActiveClubId(initialActiveClubId); // Ensure this is set
+      setCurrentActiveClubId(initialActiveClubId); 
       if (userDetails.email && initialActiveClubId) {
          loadClubAndAvailabilityData(initialActiveClubId, userDetails.email);
       } else {
-        setIsLoading(false); // If no active club or no email somehow
+        setIsLoading(false); 
       }
     }
   }, [router, toast, loadClubAndAvailabilityData]);
@@ -184,7 +183,7 @@ export default function AvailabilityForm() {
   const handleClubChange = (newClubId: string) => {
     setActiveClubId(newClubId);
     setCurrentActiveClubId(newClubId);
-    setShowPostulationSummary(false); // Hide summary when club changes
+    setShowPostulationSummary(false); 
     if (currentUser?.email) {
       loadClubAndAvailabilityData(newClubId, currentUser.email);
     }
@@ -226,7 +225,6 @@ export default function AvailabilityForm() {
           title: "Postulación Enviada",
           description: `Registrada para ${getClubNameById(actualClubId) || 'el club'}.`,
         });
-        // After new submission, update state to reflect this new "pending" request
         setIsEditing(true);
         setEditingRequestId(successResult.id);
         setCanEditCurrentPostulation(isPostulationEditable(successResult.selectedMatches));
@@ -235,8 +233,8 @@ export default function AvailabilityForm() {
       }
     }
     if (successResult) {
-        setCurrentPostulation(successResult); // Update current postulation with new/updated data
-        setShowPostulationSummary(true); // Show summary view
+        setCurrentPostulation(successResult); 
+        setShowPostulationSummary(true); 
     }
   }
   
@@ -427,8 +425,6 @@ export default function AvailabilityForm() {
                               const isChecked = field.value?.some(m => m.id === match.id);
                               const isMatchPastOrTooClose = !isMatchEditable(match.date);
                               const isDisabledForSelection = isEditing && !canEditCurrentPostulation && isChecked && isMatchPastOrTooClose;
-                               // If editing an existing uneditable postulation, keep its selections, but disable changes to those specific items.
-                               // New items cannot be selected if the overall postulation is uneditable.
 
                               return (
                                 <FormItem
@@ -442,8 +438,8 @@ export default function AvailabilityForm() {
                                     <Checkbox
                                       checked={isChecked}
                                       onCheckedChange={(checked) => {
-                                        if (isEditing && !canEditCurrentPostulation && isChecked) return; // Prevent unchecking if part of uneditable postulation
-                                        if (isMatchPastOrTooClose && checked) return; // Prevent selecting a past/too close match if not already selected
+                                        if (isEditing && !canEditCurrentPostulation && isChecked) return; 
+                                        if (isMatchPastOrTooClose && checked) return; 
                                         
                                         return checked
                                           ? field.onChange([...(field.value || []), match])
@@ -542,3 +538,4 @@ export default function AvailabilityForm() {
     </Card>
   );
 }
+
