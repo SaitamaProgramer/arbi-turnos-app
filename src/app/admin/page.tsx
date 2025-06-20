@@ -104,6 +104,11 @@ export default function AdminPage() {
     }
   };
   
+  const refreshAssignments = () => {
+    if (currentClub) {
+      setMatchAssignments(getMatchAssignments().filter(a => a.clubId === currentClub.id));
+    }
+  };
 
   if (isLoading || !currentUser) { 
     return (
@@ -148,7 +153,7 @@ export default function AdminPage() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="dashboard" className="w-full relative">
-            <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-4 mb-20 relative z-10 [transform:translateZ(0px)]">
+            <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-4 mb-24 md:mb-8 relative z-10 [transform:translateZ(0px)]">
                <TabsTrigger value="dashboard">
                 <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
               </TabsTrigger>
@@ -173,9 +178,10 @@ export default function AdminPage() {
               <ShiftTable 
                 clubId={currentClub.id}
                 definedMatchesForClub={clubDefinedMatches}
-                allShiftRequestsForClub={requests}
-                allClubReferees={refereesInClub}
-                initialMatchAssignments={matchAssignments}
+                allShiftRequestsForClub={requests} // To find who postulated for which match
+                allClubReferees={refereesInClub} // For displaying general referee info if needed
+                initialMatchAssignments={matchAssignments} // Pass current assignments
+                onAssignmentChanged={refreshAssignments} // Callback to refresh assignments on change
               />
             </TabsContent>
             <TabsContent value="match-manager" className="relative z-0"> 
