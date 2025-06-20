@@ -13,10 +13,10 @@ import {
   getRefereesByClubId,
   getActiveClubId,
   setActiveClubId,
-  getClubDefinedMatches, // Added
-  getMatchAssignments,  // Added
+  getClubDefinedMatches, 
+  getMatchAssignments,  
 } from "@/lib/localStorage";
-import type { ShiftRequest, User, Club, ClubSpecificMatch, MatchAssignment } from "@/types"; // Added ClubSpecificMatch, MatchAssignment
+import type { ShiftRequest, User, Club, ClubSpecificMatch, MatchAssignment } from "@/types"; 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClipboardList, Settings, Loader2, ShieldAlert, Info, Copy, LayoutDashboard, CalendarPlus } from "lucide-react";
@@ -30,8 +30,8 @@ export default function AdminPage() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [currentClub, setCurrentClub] = useState<Club | null>(null);
   const [refereesInClub, setRefereesInClub] = useState<User[]>([]);
-  const [clubDefinedMatches, setClubDefinedMatches] = useState<ClubSpecificMatch[]>([]); // Added
-  const [matchAssignments, setMatchAssignments] = useState<MatchAssignment[]>([]); // Added
+  const [clubDefinedMatches, setClubDefinedMatches] = useState<ClubSpecificMatch[]>([]); 
+  const [matchAssignments, setMatchAssignments] = useState<MatchAssignment[]>([]); 
 
   const router = useRouter();
   const { toast } = useToast();
@@ -47,7 +47,6 @@ export default function AdminPage() {
 
     if (user && user.role === 'admin' && user.administeredClubId) {
       const adminClubId = user.administeredClubId;
-      // Ensure active club is the admin's club
       if (getActiveClubId() !== adminClubId) {
           setActiveClubId(adminClubId); 
       }
@@ -55,10 +54,10 @@ export default function AdminPage() {
       const club = findClubById(adminClubId);
       if (club) {
         setCurrentClub(club);
-        setRequests(getShiftRequests(club.id)); // Shift requests for this admin's club
+        setRequests(getShiftRequests(club.id)); 
         setRefereesInClub(getRefereesByClubId(club.id));
-        setClubDefinedMatches(getClubDefinedMatches(club.id)); // Matches defined for this club
-        setMatchAssignments(getMatchAssignments().filter(a => a.clubId === club.id)); // Assignments for this club
+        setClubDefinedMatches(getClubDefinedMatches(club.id)); 
+        setMatchAssignments(getMatchAssignments().filter(a => a.clubId === club.id)); 
       } else {
          toast({ title: "Error de Club", description: "No se pudo encontrar el club que administras.", variant: "destructive" });
          router.push('/login'); 
@@ -98,15 +97,12 @@ export default function AdminPage() {
     }
   };
 
-  // Callback to refresh club-defined matches if ClubMatchManager updates them
   const refreshClubMatches = () => {
     if (currentClub) {
       setClubDefinedMatches(getClubDefinedMatches(currentClub.id));
     }
   };
   
-  // Callback to refresh assignments if ShiftTable updates them (passed down to ShiftTable)
-  // This is implicitly handled by assignmentVersion state within ShiftTable now.
 
   if (isLoading || !currentUser) { 
     return (
@@ -151,11 +147,11 @@ export default function AdminPage() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="dashboard" className="w-full">
-            <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-4 mb-6">
+            <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-4 mb-6 relative z-10">
                <TabsTrigger value="dashboard">
                 <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
               </TabsTrigger>
-              <TabsTrigger value="assignments"> {/* Renamed from 'shifts' */}
+              <TabsTrigger value="assignments"> 
                 <ClipboardList className="mr-2 h-4 w-4" /> Gestionar Asignaciones
               </TabsTrigger>
               <TabsTrigger value="match-manager"> 
@@ -169,10 +165,10 @@ export default function AdminPage() {
               <AdminDashboard 
                 clubId={currentClub.id} 
                 allRefereesInClub={refereesInClub}
-                shiftRequestsForClub={requests} // Pass all requests for dashboard stats
+                shiftRequestsForClub={requests} 
               />
             </TabsContent>
-            <TabsContent value="assignments"> {/* Renamed from 'shifts' */}
+            <TabsContent value="assignments"> 
               <ShiftTable 
                 clubId={currentClub.id}
                 definedMatchesForClub={clubDefinedMatches}
@@ -212,3 +208,4 @@ export default function AdminPage() {
     </div>
   );
 }
+
