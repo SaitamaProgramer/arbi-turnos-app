@@ -1,21 +1,22 @@
 
 import type { ShiftRequest, User, Club, ClubSpecificMatch, MatchAssignment } from '@/types';
+import { formatISO, addDays, subDays, parseISO, isBefore, startOfDay } from 'date-fns';
 
-const SHIFT_REQUESTS_KEY = 'arbitros_shift_requests_v4';
-const CLUB_DEFINED_MATCHES_KEY = 'arbitros_club_defined_matches_v1';
+const SHIFT_REQUESTS_KEY = 'arbitros_shift_requests_v5';
+const CLUB_DEFINED_MATCHES_KEY = 'arbitros_club_defined_matches_v2';
 const USERS_KEY = 'arbitros_users_v3'; 
 const CLUBS_KEY = 'arbitros_clubs_v1';
 const CURRENT_USER_EMAIL_KEY = 'arbitros_current_user_email_v2';
 const ACTIVE_CLUB_ID_KEY = 'arbitros_active_club_id_v1'; 
-const MATCH_ASSIGNMENTS_KEY = 'arbitros_match_assignments_v1'; // New key for assignments
-const TEST_DATA_INITIALIZED_KEY = 'arbitros_test_data_initialized_v3'; // Incremented version for new data structure
+const MATCH_ASSIGNMENTS_KEY = 'arbitros_match_assignments_v1';
+const TEST_DATA_INITIALIZED_KEY = 'arbitros_test_data_initialized_v4'; // Incremented for new match structure
 
 function initializeWithTestData() {
   if (typeof window === 'undefined' || localStorage.getItem(TEST_DATA_INITIALIZED_KEY)) {
     return;
   }
 
-  console.log("Initializing with V3 test data (match assignments)...");
+  console.log("Initializing with V4 test data (detailed matches & more shift requests)...");
 
   const club1Id = "club-bh-01";
   const club2Id = "club-rs-02";
@@ -31,71 +32,106 @@ function initializeWithTestData() {
     { id: "refUser1", name: "Referee Uno (Bahía)", email: "ref1@example.com", password: "password", role: "referee", memberClubIds: [club1Id] },
     { id: "refUser2", name: "Referee Dos (Bahía)", email: "ref2@example.com", password: "password", role: "referee", memberClubIds: [club1Id] },
     { id: "refUser3", name: "Referee Tres (Rosales)", email: "ref3@example.com", password: "password", role: "referee", memberClubIds: [club2Id] },
+    { id: "refUser4", name: "Referee Cuatro (Bahía)", email: "ref4@example.com", password: "password", role: "referee", memberClubIds: [club1Id] },
     { id: "refUserMulti", name: "Referee MultiClub", email: "refMulti@example.com", password: "password", role: "referee", memberClubIds: [club1Id, club2Id] },
   ];
   setItem(USERS_KEY, users);
+  
+  const today = new Date();
+  const tomorrow = addDays(today, 1);
+  const dayAfterTomorrow = addDays(today, 2);
+  const nextWeek = addDays(today, 7);
+  const yesterday = subDays(today, 1);
+
 
   const clubMatchesData: Record<string, ClubSpecificMatch[]> = {
     [club1Id]: [
-      { id: "match_bh_001", description: "Sábado 15:00 - Cancha Principal - Final Liga A" },
-      { id: "match_bh_002", description: "Sábado 17:00 - Cancha Principal - Final Liga B" },
-      { id: "match_bh_003", description: "Domingo 10:00 - Cancha Auxiliar - Sub-17" },
+      { id: "match_bh_001", description: "Final Liga A", date: formatISO(dayAfterTomorrow, { representation: 'date' }), time: "15:00", location: "Cancha Principal" },
+      { id: "match_bh_002", description: "Final Liga B", date: formatISO(dayAfterTomorrow, { representation: 'date' }), time: "17:00", location: "Cancha Principal" },
+      { id: "match_bh_003", description: "Sub-17", date: formatISO(nextWeek, { representation: 'date' }), time: "10:00", location: "Cancha Auxiliar" },
+      { id: "match_bh_004", description: "Veteranos Partido Amistoso", date: formatISO(tomorrow, { representation: 'date' }), time: "11:00", location: "Predio Los Sauces" }, // Match for tomorrow (edit restricted)
+      { id: "match_bh_005", description: "Reserva vs Primera Local", date: formatISO(yesterday, { representation: 'date' }), time: "16:00", location: "Estadio Municipal" }, // Match for yesterday (edit restricted)
     ],
     [club2Id]: [
-      { id: "match_rs_001", description: "Viernes 20:00 - Polideportivo - Futsal Mayor A" },
-      { id: "match_rs_002", description: "Viernes 21:30 - Polideportivo - Futsal Mayor B" },
+      { id: "match_rs_001", description: "Futsal Mayor A", date: formatISO(nextWeek, { representation: 'date' }), time: "20:00", location: "Polideportivo" },
+      { id: "match_rs_002", description: "Futsal Mayor B", date: formatISO(addDays(nextWeek,1), { representation: 'date' }), time: "21:30", location: "Polideportivo" },
     ],
   };
   setItem(CLUB_DEFINED_MATCHES_KEY, clubMatchesData);
 
   const shiftRequests: ShiftRequest[] = [
+    // Ref 1 (Bahia) - Postulated for 2 matches in the future
     { 
-      id: crypto.randomUUID(), 
+      id: "sr_ref1_bh_01", 
       userEmail: "ref1@example.com", 
       clubId: club1Id, 
       selectedMatches: [clubMatchesData[club1Id][0], clubMatchesData[club1Id][2]], 
       hasCar: true, 
-      notes: "Prefiero el de la mañana del domingo si es posible.", 
+      notes: "Prefiero el de la mañana del domingo (Sub-17) si es posible.", 
       status: 'pending', 
       submittedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
     },
-    { 
-      id: crypto.randomUUID(), 
-      userEmail: "refUserMulti@example.com", // MultiClub user applied for a Bahia match
+    // Ref 4 (Bahia) - Postulated for the same match as Ref1 (match_bh_001) and another
+     { 
+      id: "sr_ref4_bh_01", 
+      userEmail: "ref4@example.com", 
       clubId: club1Id, 
-      selectedMatches: [clubMatchesData[club1Id][0]], // Applied for the same match as ref1
+      selectedMatches: [clubMatchesData[club1Id][0], clubMatchesData[club1Id][1]], 
+      hasCar: false, 
+      notes: "Disponible para ambas finales de Liga A y B.", 
+      status: 'pending', 
+      submittedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
+    },
+    // Ref MultiClub - Postulated for a Bahia match (match_bh_001 - same as Ref1 and Ref4)
+    { 
+      id: "sr_refMulti_bh_01", 
+      userEmail: "refMulti@example.com", 
+      clubId: club1Id, 
+      selectedMatches: [clubMatchesData[club1Id][0]], 
       hasCar: false, 
       notes: "También disponible para Final Liga A en Bahía.", 
       status: 'pending', 
       submittedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
     },
+    // Ref 3 (Rosales) - Postulated for one match
     { 
-      id: crypto.randomUUID(), 
+      id: "sr_ref3_rs_01", 
       userEmail: "ref3@example.com", 
       clubId: club2Id, 
       selectedMatches: [clubMatchesData[club2Id][1]], 
       hasCar: true, 
       notes: "", 
-      status: 'pending', // Status changed to pending, assignment will be separate
+      status: 'pending',
       submittedAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString()
     },
+    // Ref 1 (Bahia) - Postulated for a match that is tomorrow (for testing edit restriction)
+    {
+      id: "sr_ref1_bh_02_tomorrow",
+      userEmail: "ref1@example.com",
+      clubId: club1Id,
+      selectedMatches: [clubMatchesData[club1Id][3]], // match_bh_004 is tomorrow
+      hasCar: true,
+      notes: "Postulación para partido de mañana.",
+      status: 'pending',
+      submittedAt: new Date().toISOString()
+    }
   ];
   setItem(SHIFT_REQUESTS_KEY, shiftRequests);
 
-  // Initialize empty match assignments
   const matchAssignments: MatchAssignment[] = [
-    // Example: Assign ref3 to one of their postulated matches
+    // Example: Assign refUserMulti to match_bh_002 (Final Liga B)
+    // This is commented out to allow admins to test assignment.
     // {
-    //   clubId: club2Id,
-    //   matchId: clubMatchesData[club2Id][1].id, // Viernes 21:30
-    //   assignedRefereeEmail: "ref3@example.com",
+    //   clubId: club1Id,
+    //   matchId: clubMatchesData[club1Id][1].id, 
+    //   assignedRefereeEmail: "refMulti@example.com",
     //   assignedAt: new Date().toISOString(),
     // }
   ];
   setItem(MATCH_ASSIGNMENTS_KEY, matchAssignments);
 
   localStorage.setItem(TEST_DATA_INITIALIZED_KEY, 'true');
-  console.log("Test data V3 (match assignments) initialized.");
+  console.log("Test data V4 (detailed matches) initialized.");
 }
 
 
@@ -103,13 +139,11 @@ function getItem<T>(key: string, defaultValue: T): T {
   if (typeof window === 'undefined') {
     return defaultValue;
   }
-  // Initialize if main data keys are missing
   if (!localStorage.getItem(TEST_DATA_INITIALIZED_KEY)) {
-    if (key === USERS_KEY || key === CLUBS_KEY || key === SHIFT_REQUESTS_KEY || key === CLUB_DEFINED_MATCHES_KEY || key === MATCH_ASSIGNMENTS_KEY) {
+    if ([USERS_KEY, CLUBS_KEY, SHIFT_REQUESTS_KEY, CLUB_DEFINED_MATCHES_KEY, MATCH_ASSIGNMENTS_KEY].includes(key)) {
         initializeWithTestData();
     }
   }
-
   try {
     const data = localStorage.getItem(key);
     return data ? JSON.parse(data) : defaultValue;
@@ -160,31 +194,40 @@ export const addUser = (
   userData: Omit<User, 'id' | 'administeredClubId' | 'memberClubIds'> & { role: 'admin' | 'referee'; clubName?: string; clubIdToJoin?: string }
 ): { user?: User; club?: Club; error?: string } => {
   const users = getUsers();
-  if (users.find(user => user.email === userData.email)) return { error: "El correo electrónico ya está registrado." };
+  if (users.find(user => user.email === userData.email && user.role === userData.role)) { // Check if email + role combo exists
+     if (userData.role === 'referee' && userData.clubIdToJoin) { // If referee and trying to join another club
+        const existingUserIndex = users.findIndex(u => u.email === userData.email && u.role === 'referee');
+        if (existingUserIndex > -1) {
+            if (users[existingUserIndex].memberClubIds?.includes(userData.clubIdToJoin)) {
+                return { error: "Ya eres miembro de este club con este correo electrónico." };
+            }
+            const clubToJoin = findClubById(userData.clubIdToJoin);
+            if (!clubToJoin) return { error: "El código de club no es válido o el club no existe." };
+            users[existingUserIndex].memberClubIds = [...(users[existingUserIndex].memberClubIds || []), userData.clubIdToJoin];
+            saveUsers(users);
+            return { user: users[existingUserIndex] };
+        }
+     }
+     return { error: "El correo electrónico ya está registrado para este rol." };
+  }
+  if (users.find(user => user.email === userData.email && user.role !== userData.role)) {
+    return { error: "Este correo electrónico ya está registrado con un rol diferente." };
+  }
+
+
   const userId = crypto.randomUUID();
   let newUser: User; let newClub: Club | undefined;
   if (userData.role === 'admin') {
     if (!userData.clubName) return { error: "El nombre del club es requerido para administradores." };
     newClub = addClub(userData.clubName, userId);
     newUser = { id: userId, name: userData.name, email: userData.email, password: userData.password, role: 'admin', administeredClubId: newClub.id };
+    users.push(newUser);
   } else { 
     if (!userData.clubIdToJoin) return { error: "El código de club es requerido para árbitros." };
     const clubToJoin = findClubById(userData.clubIdToJoin);
     if (!clubToJoin) return { error: "El código de club no es válido o el club no existe." };
-    
-    // Check if user already exists with this email to add new clubId, or create new user
-    const existingUserIndex = users.findIndex(u => u.email === userData.email);
-    if (existingUserIndex > -1) { // User exists, add clubId if not already a member
-        const existingUser = users[existingUserIndex];
-        if (existingUser.role !== 'referee') return { error: "Este email ya está registrado con un rol diferente."};
-        if (existingUser.memberClubIds?.includes(userData.clubIdToJoin)) return { error: "Ya eres miembro de este club."};
-        existingUser.memberClubIds = [...(existingUser.memberClubIds || []), userData.clubIdToJoin];
-        users[existingUserIndex] = existingUser;
-        newUser = existingUser;
-    } else { // New user
-        newUser = { id: userId, name: userData.name, email: userData.email, password: userData.password, role: 'referee', memberClubIds: [userData.clubIdToJoin] };
-        users.push(newUser);
-    }
+    newUser = { id: userId, name: userData.name, email: userData.email, password: userData.password, role: 'referee', memberClubIds: [userData.clubIdToJoin] };
+    users.push(newUser);
   }
   saveUsers(users);
   return { user: newUser, club: newClub };
@@ -230,6 +273,13 @@ export const updateShiftRequestDetails = (
   if (requestIndex === -1) return null;
   const originalRequest = requests[requestIndex];
   if (originalRequest.userEmail !== userEmail || originalRequest.status !== 'pending') return null;
+  
+  // Check if any match in the postulation is too close to edit
+  if (isPostulationEditable(originalRequest.selectedMatches) === false) {
+    console.warn("Attempted to edit a postulation that is too close to match date(s).");
+    return null; // Or throw an error / return specific error code
+  }
+
   const updatedRequest: ShiftRequest = {
     ...originalRequest,
     selectedMatches: newData.selectedMatches,
@@ -241,13 +291,12 @@ export const updateShiftRequestDetails = (
   saveShiftRequests(requests);
   return updatedRequest;
 };
-// updateShiftRequestStatus now only handles 'pending' and 'completed'. 'assigned' is handled by MatchAssignments
+
 export const updateShiftRequestStatus = (id: string, status: 'pending' | 'completed'): ShiftRequest | null => {
   const requests = getItem<ShiftRequest[]>(SHIFT_REQUESTS_KEY, []);
   const requestIndex = requests.findIndex(req => req.id === id);
   if (requestIndex === -1) return null;
   requests[requestIndex].status = status;
-  // requests[requestIndex].assignedRefereeName = undefined; // Ensure this is cleared if changing from an old 'assigned'
   saveShiftRequests(requests);
   return requests[requestIndex];
 };
@@ -268,7 +317,6 @@ function saveClubDefinedMatchesAllClubs(allClubMatches: Record<string, ClubSpeci
   setItem(CLUB_DEFINED_MATCHES_KEY, allClubMatches);
 }
 
-// Match Assignment Functions
 export const getMatchAssignments = (): MatchAssignment[] => {
   return getItem<MatchAssignment[]>(MATCH_ASSIGNMENTS_KEY, []);
 };
@@ -283,6 +331,23 @@ export const getAssignmentForMatch = (clubId: string, matchId: string): MatchAss
 export const assignRefereeToMatch = (clubId: string, matchId: string, assignedRefereeEmail: string): MatchAssignment => {
   let assignments = getMatchAssignments();
   const existingAssignmentIndex = assignments.findIndex(a => a.clubId === clubId && a.matchId === matchId);
+  
+  // Check if this referee is already assigned to another match at the exact same date and time
+  const matchToAssign = getClubDefinedMatches(clubId).find(m => m.id === matchId);
+  if (matchToAssign) {
+    const existingAssignmentsForReferee = assignments.filter(a => a.assignedRefereeEmail === assignedRefereeEmail && a.clubId === clubId);
+    for (const existingAsg of existingAssignmentsForReferee) {
+      if (existingAsg.matchId === matchId) continue; // It's the same match, allow re-assignment
+      const existingMatchDetails = getClubDefinedMatches(clubId).find(m => m.id === existingAsg.matchId);
+      if (existingMatchDetails && existingMatchDetails.date === matchToAssign.date && existingMatchDetails.time === matchToAssign.time) {
+         console.warn(`Referee ${assignedRefereeEmail} is already assigned to ${existingMatchDetails.description} at the same date/time.`);
+         // Optionally, you could throw an error or return a specific status to prevent double booking
+         // For now, we'll allow it but log a warning.
+      }
+    }
+  }
+
+
   const newAssignment: MatchAssignment = { 
     clubId, 
     matchId, 
@@ -295,20 +360,55 @@ export const assignRefereeToMatch = (clubId: string, matchId: string, assignedRe
     assignments.push(newAssignment);
   }
   saveMatchAssignments(assignments);
+
+  // Update status of original ShiftRequests containing this match for the assigned user
+  const allShiftRequests = getShiftRequests();
+  allShiftRequests.forEach(req => {
+    if (req.userEmail === assignedRefereeEmail && req.clubId === clubId && req.selectedMatches.some(m => m.id === matchId)) {
+        // If all matches in this request are now assigned, mark request as completed.
+        // This is a simplification; a more complex logic might be needed.
+        const allSelectedMatchesAssigned = req.selectedMatches.every(sm => 
+            getAssignmentForMatch(clubId, sm.id)?.assignedRefereeEmail === assignedRefereeEmail
+        );
+        if (allSelectedMatchesAssigned) {
+            // updateShiftRequestStatus(req.id, 'completed'); // This might be too aggressive
+        }
+    }
+  });
+
   return newAssignment;
 };
 
 export const unassignRefereeFromMatch = (clubId: string, matchId: string): void => {
   let assignments = getMatchAssignments();
-  assignments = assignments.filter(a => !(a.clubId === clubId && a.matchId === matchId));
-  saveMatchAssignments(assignments);
+  const assignmentToRemove = assignments.find(a => a.clubId === clubId && a.matchId === matchId);
+  
+  if (assignmentToRemove) {
+      const refereeEmail = assignmentToRemove.assignedRefereeEmail;
+      assignments = assignments.filter(a => !(a.clubId === clubId && a.matchId === matchId));
+      saveMatchAssignments(assignments);
+
+      // Potentially revert status of original ShiftRequests
+      const allShiftRequests = getShiftRequests();
+        allShiftRequests.forEach(req => {
+        if (req.userEmail === refereeEmail && req.clubId === clubId && req.selectedMatches.some(m => m.id === matchId) && req.status === 'completed') {
+            // If unassigning makes this request no longer fully assigned, set it back to pending.
+            const anyMatchStillAssignedToThisUserInRequest = req.selectedMatches.some(sm => 
+                getAssignmentForMatch(clubId, sm.id)?.assignedRefereeEmail === refereeEmail
+            );
+            if (!anyMatchStillAssignedToThisUserInRequest) {
+               // updateShiftRequestStatus(req.id, 'pending'); // Careful with this auto-revert
+            }
+        }
+      });
+  }
 };
 
 export const getRefereesPostulatedForMatch = (clubId: string, matchId: string): User[] => {
   const shiftRequestsForClub = getShiftRequests(clubId);
   const emails: string[] = [];
   shiftRequestsForClub.forEach(req => {
-    if (req.selectedMatches.some(match => match.id === matchId)) {
+    if (req.status === 'pending' && req.selectedMatches.some(match => match.id === matchId)) {
       if (!emails.includes(req.userEmail)) {
         emails.push(req.userEmail);
       }
@@ -323,3 +423,27 @@ export const getRefereeNameByEmail = (email: string): string | undefined => {
   return user?.name;
 }
 
+// Helper function to check if any match in a list is too close to edit
+export const isMatchEditable = (matchDate: string): boolean => {
+  try {
+    const today = startOfDay(new Date());
+    const mDate = startOfDay(parseISO(matchDate)); // matchDate should be 'YYYY-MM-DD'
+    
+    // If match date is before today (i.e., in the past), not editable
+    if (isBefore(mDate, today)) return false;
+    
+    // If match date is today or tomorrow, not editable
+    // (mDate - today) will be 0 for today, 1 * day_in_ms for tomorrow.
+    // We want to disallow if diff_in_days <= 1
+    const diffInDays = (mDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+    return diffInDays > 1; // Editable if more than 1 day away (i.e., at least 2 days away)
+  } catch (e) {
+    console.error("Error parsing match date for editability check:", matchDate, e);
+    return false; // Default to not editable on error
+  }
+};
+
+export const isPostulationEditable = (selectedMatches: ClubSpecificMatch[]): boolean => {
+  if (!selectedMatches || selectedMatches.length === 0) return true; // No matches, so "editable"
+  return selectedMatches.every(match => isMatchEditable(match.date));
+};

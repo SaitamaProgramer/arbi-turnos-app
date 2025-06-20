@@ -1,7 +1,10 @@
 
 export interface ClubSpecificMatch {
   id: string;
-  description: string; // Example: "Sábado 10:00 - Cancha 1: Sub-15 Final"
+  description: string; 
+  date: string; // ISO string for date, e.g., "2024-07-28"
+  time: string; // e.g., "15:00"
+  location: string;
 }
 
 export interface ShiftRequest {
@@ -11,9 +14,8 @@ export interface ShiftRequest {
   selectedMatches: ClubSpecificMatch[];
   hasCar: boolean;
   notes: string;
-  status: 'pending' | 'completed'; // 'assigned' status is removed from ShiftRequest
+  status: 'pending' | 'completed'; 
   submittedAt: string; 
-  // assignedRefereeName?: string; // Removed: assignment is now per match
 }
 
 export const DAYS_OF_WEEK = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
@@ -35,10 +37,9 @@ export interface User {
   password?: string; 
 }
 
-// New interface for individual match assignments
 export interface MatchAssignment {
   clubId: string;
-  matchId: string; // Corresponds to ClubSpecificMatch.id
+  matchId: string; 
   assignedRefereeEmail: string;
   assignedAt: string;
 }
