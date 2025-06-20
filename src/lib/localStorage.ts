@@ -9,7 +9,7 @@ const CLUBS_KEY = 'arbitros_clubs_v1';
 const CURRENT_USER_EMAIL_KEY = 'arbitros_current_user_email_v2';
 const ACTIVE_CLUB_ID_KEY = 'arbitros_active_club_id_v1'; 
 const MATCH_ASSIGNMENTS_KEY = 'arbitros_match_assignments_v1';
-const TEST_DATA_INITIALIZED_KEY = 'arbitros_test_data_initialized_v5'; // Incremented for new match structure + more requests
+const TEST_DATA_INITIALIZED_KEY = 'arbitros_test_data_initialized_v5'; 
 
 function initializeWithTestData() {
   if (typeof window === 'undefined' || localStorage.getItem(TEST_DATA_INITIALIZED_KEY)) {
@@ -39,11 +39,11 @@ function initializeWithTestData() {
   setItem(USERS_KEY, users);
   
   const today = new Date();
-  const tomorrow = addDays(today, 1); // Not editable (1 day away)
-  const dayAfterTomorrow = addDays(today, 2); // Not editable (2 days away)
-  const threeDaysFromNow = addDays(today, 3); // Editable (3 days away)
-  const nextWeek = addDays(today, 7); // Editable
-  const yesterday = subDays(today, 1); // Not editable (past)
+  const tomorrow = addDays(today, 1); 
+  const dayAfterTomorrow = addDays(today, 2); 
+  const threeDaysFromNow = addDays(today, 3); 
+  const nextWeek = addDays(today, 7); 
+  const yesterday = subDays(today, 1);
 
 
   const clubMatchesData: Record<string, ClubSpecificMatch[]> = {
@@ -63,62 +63,56 @@ function initializeWithTestData() {
   setItem(CLUB_DEFINED_MATCHES_KEY, clubMatchesData);
 
   const shiftRequests: ShiftRequest[] = [
-    // Ref 1 (Bahia) - Postulated for 2 matches (1 editable, 1 not due to proximity)
     { 
       id: "sr_ref1_bh_01", 
       userEmail: "ref1@example.com", 
       clubId: club1Id, 
-      selectedMatches: [clubMatchesData[club1Id][0], clubMatchesData[club1Id][3]], // match_bh_001 (3 days), match_bh_004 (tomorrow)
+      selectedMatches: [clubMatchesData[club1Id][0], clubMatchesData[club1Id][3]], 
       hasCar: true, 
       notes: "Prefiero el de las 15:00 si es posible.", 
       status: 'pending', 
       submittedAt: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString()
     },
-    // Ref 4 (Bahia) - Postulated for the same editable match as Ref1 (match_bh_001) and another editable one
      { 
       id: "sr_ref4_bh_01", 
       userEmail: "ref4@example.com", 
       clubId: club1Id, 
-      selectedMatches: [clubMatchesData[club1Id][0], clubMatchesData[club1Id][1]], // match_bh_001 (3 days), match_bh_002 (3 days)
+      selectedMatches: [clubMatchesData[club1Id][0], clubMatchesData[club1Id][1]], 
       hasCar: false, 
       notes: "Disponible para ambas finales de Liga A y B.", 
       status: 'pending', 
       submittedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
     },
-    // Ref MultiClub - Postulated for an editable Bahia match (match_bh_001 - same as Ref1 and Ref4)
     { 
       id: "sr_refMulti_bh_01", 
       userEmail: "refMulti@example.com", 
       clubId: club1Id, 
-      selectedMatches: [clubMatchesData[club1Id][0]], // match_bh_001 (3 days)
+      selectedMatches: [clubMatchesData[club1Id][0]], 
       hasCar: true, 
       notes: "También disponible para Final Liga A en Bahía.", 
       status: 'pending', 
       submittedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000).toISOString()
     },
-     // Ref 5 (Bahia) - Postulated for the same match as Ref1, Ref4, RefMulti (match_bh_001)
     { 
       id: "sr_ref5_bh_01", 
       userEmail: "ref5@example.com", 
       clubId: club1Id, 
-      selectedMatches: [clubMatchesData[club1Id][0]], // match_bh_001 (3 days)
+      selectedMatches: [clubMatchesData[club1Id][0]], 
       hasCar: true, 
       notes: "Postulado para la final de Liga A.", 
       status: 'pending', 
-      submittedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 500).toISOString() // slightly different time
+      submittedAt: new Date(Date.now() - 1 * 24 * 60 * 60 * 500).toISOString() 
     },
-    // Ref 2 (Bahia) - Postulated for a match that is two days away (not editable)
     {
       id: "sr_ref2_bh_02_pasado_manana",
       userEmail: "ref2@example.com",
       clubId: club1Id,
-      selectedMatches: [clubMatchesData[club1Id][4]], // match_bh_005 (pasado mañana)
+      selectedMatches: [clubMatchesData[club1Id][4]], 
       hasCar: false,
       notes: "Postulación para partido de pasado mañana.",
       status: 'pending',
       submittedAt: new Date().toISOString()
     },
-    // Ref 3 (Rosales) - Postulated for one match
     { 
       id: "sr_ref3_rs_01", 
       userEmail: "ref3@example.com", 
@@ -133,10 +127,11 @@ function initializeWithTestData() {
   setItem(SHIFT_REQUESTS_KEY, shiftRequests);
 
   const matchAssignments: MatchAssignment[] = [
-    // Example: Assign refUser1 to match_bh_002 (Final Liga B)
+     // Example: Assign refUser1 to match_bh_002 (Final Liga B).
+     // This should make refUser1's postulation (if it includes match_bh_002) non-editable for them.
     // {
     //   clubId: club1Id,
-    //   matchId: clubMatchesData[club1Id][1].id, // match_bh_002
+    //   matchId: "match_bh_002", 
     //   assignedRefereeEmail: "ref1@example.com",
     //   assignedAt: new Date().toISOString(),
     // }
@@ -160,7 +155,8 @@ function getItem<T>(key: string, defaultValue: T): T {
   try {
     const data = localStorage.getItem(key);
     return data ? JSON.parse(data) : defaultValue;
-  } catch (error) {
+  } catch (error)
+{
     console.error(`Error parsing ${key} from localStorage:`, error);
     return defaultValue;
   }
@@ -279,26 +275,40 @@ export const addShiftRequest = (
 export const updateShiftRequestDetails = (
   requestId: string,
   userEmail: string,
-  newData: { selectedMatches: ClubSpecificMatch[], hasCar: boolean, notes: string }
+  newData: { selectedMatches: ClubSpecificMatch[], hasCar: boolean, notes: string },
+  allAssignmentsForUserInClub: MatchAssignment[]
 ): ShiftRequest | null => {
   const requests = getItem<ShiftRequest[]>(SHIFT_REQUESTS_KEY, []);
   const requestIndex = requests.findIndex(req => req.id === requestId);
   if (requestIndex === -1) return null;
+
   const originalRequest = requests[requestIndex];
   if (originalRequest.userEmail !== userEmail || originalRequest.status !== 'pending') return null;
   
-  if (isPostulationEditable(originalRequest.selectedMatches) === false && isPostulationEditable(newData.selectedMatches) === false) {
-     // Allow notes/car update even if matches not editable, as long as matches themselves don't change
-     if (JSON.stringify(originalRequest.selectedMatches.map(m=>m.id).sort()) !== JSON.stringify(newData.selectedMatches.map(m=>m.id).sort())) {
-        console.warn("Attempted to change matches in a postulation that is not fully editable.");
-        return null;
-     }
-  } else if (!isPostulationEditable(newData.selectedMatches)) {
-     // If trying to change to a set of matches that makes it uneditable, needs more granular check or disallow
-     console.warn("Attempted to update postulation to a state that is not fully editable based on new match selections.");
-     return null; // Or implement more granular logic to allow only certain changes.
-  }
+  const isOriginalPostulationEditableByDate = originalRequest.selectedMatches.every(match => isMatchEditable(match.date));
+  const isNewPostulationEditableByDate = newData.selectedMatches.every(match => isMatchEditable(match.date));
 
+  // Check if any of original selected matches are already assigned to this user
+  const isAnyOriginalMatchAssignedToUser = originalRequest.selectedMatches.some(match =>
+    allAssignmentsForUserInClub.some(asg => asg.matchId === match.id)
+  );
+  
+  // If any original match was assigned to user, no edits allowed
+  if (isAnyOriginalMatchAssignedToUser) {
+    console.warn("Attempted to edit a postulation where one or more matches are already assigned to the user.");
+    return null;
+  }
+  
+  // If original postulation wasn't editable by date, and they are trying to change matches, deny
+  if (!isOriginalPostulationEditableByDate && JSON.stringify(originalRequest.selectedMatches.map(m=>m.id).sort()) !== JSON.stringify(newData.selectedMatches.map(m=>m.id).sort())) {
+     console.warn("Attempted to change matches in a postulation that is not editable by date.");
+     return null;
+  }
+  // If new selection makes it uneditable by date, deny (this might be redundant if the form itself prevents selecting such matches)
+  if (!isNewPostulationEditableByDate && JSON.stringify(originalRequest.selectedMatches.map(m=>m.id).sort()) !== JSON.stringify(newData.selectedMatches.map(m=>m.id).sort())) {
+     console.warn("Attempted to update postulation to include matches that are too close or past.");
+     return null;
+  }
 
   const updatedRequest: ShiftRequest = {
     ...originalRequest,
@@ -361,32 +371,24 @@ export const assignRefereeToMatch = (
     return { success: false, message: "El partido a asignar no fue encontrado." };
   }
 
-  // Check for double booking for the selected referee
-  const refereeCurrentAssignments = assignments.filter(
+  const refereeCurrentAssignmentsInClub = assignments.filter(
     a => a.assignedRefereeEmail === assignedRefereeEmail && a.clubId === clubId
   );
 
-  for (const currentAsg of refereeCurrentAssignments) {
-    if (currentAsg.matchId === matchId && existingAssignmentIndex > -1) { // If re-assigning the same ref to the same match (e.g. UI glitch), allow.
+  for (const currentAsg of refereeCurrentAssignmentsInClub) {
+    if (currentAsg.matchId === matchId) { 
+      // If trying to assign same ref to same match (e.g. re-confirming or UI glitch), it's fine or will be an update.
       continue;
     }
-    if (currentAsg.matchId === matchId && existingAssignmentIndex === -1){ // Trying to assign a new ref, but this currentAsg is for the same match and a different ref
-        // This case is fine, we are replacing or assigning for the first time.
-    }
-
-
-    // If we are assigning to a *different* match than the current one in the loop (currentAsg)
-    // then check for overlap.
-    if (currentAsg.matchId !== matchId) {
-        const currentAssignedMatchDetails = getClubDefinedMatches(clubId).find(m => m.id === currentAsg.matchId);
-        if (currentAssignedMatchDetails && 
-            currentAssignedMatchDetails.date === matchToAssignDetails.date && 
-            currentAssignedMatchDetails.time === matchToAssignDetails.time) {
-        return { 
-            success: false, 
-            message: `Este árbitro (${getRefereeNameByEmail(assignedRefereeEmail) || assignedRefereeEmail}) ya está asignado a "${currentAssignedMatchDetails.description}" a la misma fecha y hora.` 
-        };
-        }
+    
+    const currentAssignedMatchDetails = getClubDefinedMatches(clubId).find(m => m.id === currentAsg.matchId);
+    if (currentAssignedMatchDetails && 
+        currentAssignedMatchDetails.date === matchToAssignDetails.date && 
+        currentAssignedMatchDetails.time === matchToAssignDetails.time) {
+      return { 
+          success: false, 
+          message: `Este árbitro (${getRefereeNameByEmail(assignedRefereeEmail) || assignedRefereeEmail}) ya está asignado a "${currentAssignedMatchDetails.description}" a la misma fecha y hora.` 
+      };
     }
   }
 
@@ -398,7 +400,6 @@ export const assignRefereeToMatch = (
   };
 
   if (existingAssignmentIndex > -1) {
-    // If there was an existing assignment for this match (possibly a different referee), replace it.
     assignments[existingAssignmentIndex] = newAssignment;
   } else {
     assignments.push(newAssignment);
@@ -438,18 +439,36 @@ export const isMatchEditable = (matchDate: string): boolean => {
     const today = startOfDay(new Date());
     const mDate = startOfDay(parseISO(matchDate)); 
     
-    if (isBefore(mDate, today)) return false;
+    if (isBefore(mDate, today)) return false; 
     
     const diffInDays = (mDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
-    return diffInDays > 2; // Editable if more than 2 days away (i.e., at least 3 days away)
+    return diffInDays > 2; 
   } catch (e) {
     console.error("Error parsing match date for editability check:", matchDate, e);
     return false; 
   }
 };
 
-export const isPostulationEditable = (selectedMatches: ClubSpecificMatch[]): boolean => {
-  if (!selectedMatches || selectedMatches.length === 0) return true; 
-  return selectedMatches.every(match => isMatchEditable(match.date));
+export const isPostulationEditable = (
+    selectedMatches: ClubSpecificMatch[],
+    assignmentsForThisUserInThisClub: MatchAssignment[]
+): boolean => {
+  if (!selectedMatches || selectedMatches.length === 0) return true; // No matches selected, can always "edit" (i.e. start a new one)
+
+  // 1. Check date-based editability for all matches
+  const allMatchesEditableByDate = selectedMatches.every(match => isMatchEditable(match.date));
+  if (!allMatchesEditableByDate) {
+    return false;
+  }
+
+  // 2. Check if any of the selected matches are already assigned to this user
+  const isAnySelectedMatchAssignedToUser = selectedMatches.some(selectedMatch =>
+    assignmentsForThisUserInThisClub.some(assignment => assignment.matchId === selectedMatch.id)
+  );
+  if (isAnySelectedMatchAssignedToUser) {
+    return false;
+  }
+  
+  return true; // All checks passed
 };
 

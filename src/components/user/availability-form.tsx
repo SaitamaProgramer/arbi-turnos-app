@@ -33,10 +33,10 @@ import {
   getClubDefinedMatches,
   isPostulationEditable,
   isMatchEditable,
-  getMatchAssignments, // Added import
+  getMatchAssignments,
 } from "@/lib/localStorage";
-import type { User, Club, ShiftRequest, ClubSpecificMatch, MatchAssignment } from "@/types"; // Added MatchAssignment
-import { ListChecks, Car, ClipboardList, Send, Loader2, AlertTriangle, Users, Edit3, Info, FileText, CheckSquare, CalendarDays, BadgeCheck } from "lucide-react";
+import type { User, Club, ShiftRequest, ClubSpecificMatch, MatchAssignment } from "@/types";
+import { ListChecks, Car, ClipboardList, Send, Loader2, AlertTriangle, Users, Edit3, Info, FileText, CheckSquare, CalendarDays, BadgeCheck, Ban } from "lucide-react";
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from 'date-fns';
@@ -120,7 +120,7 @@ export default function AvailabilityForm() {
       setAssignmentsForUser(userSpecificAssignments);
 
       if (pendingRequest) {
-        const editable = isPostulationEditable(pendingRequest.selectedMatches);
+        const editable = isPostulationEditable(pendingRequest.selectedMatches, userSpecificAssignments);
         setCanEditCurrentPostulation(editable);
         form.reset({
           selectedMatches: pendingRequest.selectedMatches,
@@ -130,13 +130,13 @@ export default function AvailabilityForm() {
         });
         setIsEditing(true);
         setEditingRequestId(pendingRequest.id);
-        setShowPostulationSummary(true); // Show summary if postulation exists
+        setShowPostulationSummary(true); 
       } else {
         form.reset({ selectedMatches: [], hasCar: undefined, notes: "", selectedClubId: clubId });
         setIsEditing(false);
         setEditingRequestId(null);
         setCanEditCurrentPostulation(true); 
-        setShowPostulationSummary(false); // No postulation, show form
+        setShowPostulationSummary(false); 
       }
     } else {
       form.reset({ selectedMatches: [], hasCar: undefined, notes: "", selectedClubId: clubId });
@@ -198,7 +198,6 @@ export default function AvailabilityForm() {
   const handleClubChange = (newClubId: string) => {
     setActiveClubId(newClubId);
     setCurrentActiveClubId(newClubId);
-    // setShowPostulationSummary(false); // Will be set by loadClubAndAvailabilityData
     if (currentUser?.email) {
       loadClubAndAvailabilityData(newClubId, currentUser.email);
     }
@@ -220,18 +219,26 @@ export default function AvailabilityForm() {
     let successResult: ShiftRequest | null = null;
 
     if (isEditing && editingRequestId) {
-      if (!canEditCurrentPostulation) {
-        toast({ title: "Edición no permitida", description: "Esta postulación no puede editarse porque uno o más partidos están demasiado próximos.", variant: "destructive" });
+       const currentAssignmentsForUser = getMatchAssignments().filter(
+            asg => asg.clubId === actualClubId && asg.assignedRefereeEmail === currentUser.email
+        );
+      if (!isPostulationEditable(data.selectedMatches, currentAssignmentsForUser) && !isPostulationEditable(currentPostulation?.selectedMatches || [], currentAssignmentsForUser) ) {
+         // This additional check verifies if the state *before* this specific submit was already uneditable due to assignment or date
+         // And if the new data state ALSO remains uneditable for the same reasons.
+         // This should allow updating notes/car even if matches are locked.
+         // However, the updateShiftRequestDetails needs to be more careful about what it allows.
+      } else if (!canEditCurrentPostulation) { // General check based on loaded state
+        toast({ title: "Edición no permitida", description: "Esta postulación no puede editarse porque uno o más partidos están demasiado próximos o ya te han sido asignados.", variant: "destructive" });
         return;
       }
-      successResult = updateShiftRequestDetails(editingRequestId, currentUser.email, requestPayload);
+      successResult = updateShiftRequestDetails(editingRequestId, currentUser.email, requestPayload, assignmentsForUser);
       if (successResult) {
         toast({
           title: "Postulación Actualizada",
           description: `Tu postulación para ${getClubNameById(actualClubId) || 'el club'} ha sido actualizada.`,
         });
       } else {
-        toast({ title: "Error al Actualizar", description: "No se pudo actualizar. Puede que el plazo haya vencido.", variant: "destructive" });
+        toast({ title: "Error al Actualizar", description: "No se pudo actualizar. Puede que el plazo haya vencido o un partido ya esté asignado.", variant: "destructive" });
       }
     } else {
       successResult = addShiftRequest(requestPayload, currentUser.email, actualClubId);
@@ -249,15 +256,9 @@ export default function AvailabilityForm() {
 
     if (successResult) {
         setCurrentPostulation(successResult); 
-        setCanEditCurrentPostulation(isPostulationEditable(successResult.selectedMatches));
-        
-        // Re-fetch assignments as they might have changed or become relevant
-        const allAssignments = getMatchAssignments();
-        const userSpecificAssignments = allAssignments.filter(
-            asg => asg.clubId === actualClubId && asg.assignedRefereeEmail === currentUser.email
-        );
-        setAssignmentsForUser(userSpecificAssignments);
-        
+        const freshAssignmentsForUser = getMatchAssignments().filter(asg => asg.clubId === actualClubId && asg.assignedRefereeEmail === currentUser.email);
+        setAssignmentsForUser(freshAssignmentsForUser);
+        setCanEditCurrentPostulation(isPostulationEditable(successResult.selectedMatches, freshAssignmentsForUser));
         setShowPostulationSummary(true); 
     }
   }
@@ -294,6 +295,7 @@ export default function AvailabilityForm() {
   const activeClubName = currentActiveClubId ? getClubNameById(currentActiveClubId) : 'Desconocido';
 
   if (showPostulationSummary && currentPostulation) {
+    const postulationIsCurrentlyEditable = isPostulationEditable(currentPostulation.selectedMatches, assignmentsForUser);
     return (
         <Card className="w-full max-w-2xl mx-auto shadow-lg">
             <CardHeader>
@@ -302,7 +304,7 @@ export default function AvailabilityForm() {
                     Resumen de tu Postulación para: <span className="font-bold text-primary">{activeClubName}</span>
                 </CardTitle>
                 <CardDescription>
-                    Esta es tu postulación actual. Puedes editarla si el plazo lo permite.
+                    Esta es tu postulación actual. {postulationIsCurrentlyEditable ? "Puedes editarla si el plazo lo permite." : "Esta postulación ya no es editable."}
                 </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
@@ -346,14 +348,14 @@ export default function AvailabilityForm() {
                 )}
                 
                 <div className="border-t pt-4">
-                {canEditCurrentPostulation ? (
+                {postulationIsCurrentlyEditable ? (
                     <Button onClick={() => setShowPostulationSummary(false)} className="w-full sm:w-auto">
                         <Edit3 className="mr-2 h-4 w-4" /> Editar Postulación
                     </Button>
                 ) : (
                      <div className="p-3 bg-yellow-100 border border-yellow-300 text-yellow-700 rounded-md text-sm flex items-start gap-2">
-                        <Info size={20} className="flex-shrink-0 mt-0.5" />
-                        <span>La edición no está permitida porque uno o más partidos de esta postulación están demasiado próximos o ya han pasado.</span>
+                        <Ban size={20} className="flex-shrink-0 mt-0.5" />
+                        <span>La edición no está permitida. Esto puede ser porque la fecha de uno o más partidos está demasiado próxima, o porque ya te han asignado a uno de los partidos de esta postulación.</span>
                     </div>
                 )}
                 </div>
@@ -375,12 +377,12 @@ export default function AvailabilityForm() {
           {isEditing && canEditCurrentPostulation ? "Modifica los detalles de tu postulación para el club:" : "Selecciona los partidos/turnos a los que deseas postularte para el club:"}
           <strong className="ml-1">{activeClubName}</strong>.
           {isEditing && canEditCurrentPostulation && <span className="block text-xs text-accent mt-1 italic"><Info size={12} className="inline mr-1"/>Estás editando una postulación previamente enviada.</span>}
-          {isEditing && !canEditCurrentPostulation && 
+          {!canEditCurrentPostulation && isEditing && (
             <span className="block text-xs text-destructive mt-1 italic">
-                <AlertTriangle size={12} className="inline mr-1"/>Esta postulación ya no es editable debido a la proximidad de las fechas de los partidos. 
-                No podrás cambiar tu selección, pero puedes ver los detalles.
+                <Ban size={12} className="inline mr-1"/>Esta postulación ya no es editable.
+                Puede ser porque la fecha de uno o más partidos está demasiado próxima, o porque ya te han asignado a uno de los partidos de esta postulación.
             </span>
-          }
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -455,7 +457,7 @@ export default function AvailabilityForm() {
                       <div className="mb-4">
                         <FormLabel className="text-base flex items-center gap-2"><ListChecks className="text-primary"/>Partidos/Turnos Disponibles</FormLabel>
                         <FormDescription>
-                          Selecciona los partidos o bloques de turno a los que te postulas. Las fechas son importantes.
+                          Selecciona los partidos o bloques de turno a los que te postulas. Las fechas y asignaciones previas son importantes.
                         </FormDescription>
                       </div>
                       <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
@@ -466,24 +468,32 @@ export default function AvailabilityForm() {
                             name="selectedMatches"
                             render={({ field }) => {
                               const isChecked = field.value?.some(m => m.id === match.id);
-                              const isThisSpecificMatchEditable = isMatchEditable(match.date);
+                              const isThisSpecificMatchActuallyEditableByDate = isMatchEditable(match.date);
                               
-                              // If overall postulation is not editable AND this match was previously checked, it stays checked but disabled.
-                              const disableCheckbox = (isEditing && !canEditCurrentPostulation && isChecked) || 
-                                                    (!isThisSpecificMatchEditable && !isChecked) || // Cannot check a past/too close match if not already checked
-                                                    (isEditing && !canEditCurrentPostulation && !isChecked); // Cannot check any new match if overall postulation uneditable
+                              // Check if this specific match is assigned to the current user
+                              const isThisMatchAssignedToCurrentUser = assignmentsForUser.some(asg => asg.matchId === match.id);
+                              
+                              // A checkbox is disabled if:
+                              // 1. The overall postulation is not editable (due to date or assignment of *any* of its items) AND this match was previously checked.
+                              // 2. This specific match is not editable by date AND it wasn't previously checked (can't select a new past/close match).
+                              // 3. This specific match IS assigned to the current user (cannot uncheck an assignment here).
+                              // 4. The overall postulation is not editable, and this match was NOT previously checked (can't add new items to a locked postulation).
+                              const disableCheckbox = 
+                                (!canEditCurrentPostulation && isChecked) || 
+                                (!isThisSpecificMatchActuallyEditableByDate && !isChecked) || 
+                                (isThisMatchAssignedToCurrentUser && isChecked) ||
+                                (!canEditCurrentPostulation && !isChecked);
                                                     
                               const labelClass = cn(
                                 "font-normal text-sm",
                                 disableCheckbox && "text-muted-foreground/70",
-                                !isThisSpecificMatchEditable && !isChecked && "text-red-500/70" // Visually mark past matches not selected
+                                !isThisSpecificMatchActuallyEditableByDate && !isChecked && "text-red-500/70" 
                               );
                               const descriptionClass = cn(
                                 "text-xs",
                                 disableCheckbox ? "text-muted-foreground/50" : "text-muted-foreground",
-                                !isThisSpecificMatchEditable && !isChecked && "text-red-500/50"
+                                !isThisSpecificMatchActuallyEditableByDate && !isChecked && "text-red-500/50"
                               );
-
 
                               return (
                                 <FormItem
@@ -512,10 +522,11 @@ export default function AvailabilityForm() {
                                   <div className="flex-1">
                                     <FormLabel className={labelClass}>
                                       {match.description}
+                                      {isThisMatchAssignedToCurrentUser && <Badge variant="default" className="ml-2 bg-green-500 text-white text-[10px] px-1.5 py-0.5">Asignado a ti</Badge>}
                                     </FormLabel>
                                     <p className={descriptionClass}>
                                         {format(parseISO(match.date), "dd/MM/yy")} - {match.time} hs. en {match.location}
-                                        {!isThisSpecificMatchEditable && <span className="text-red-500 text-xs italic ml-1">(Plazo vencido)</span>}
+                                        {!isThisSpecificMatchActuallyEditableByDate && !isThisMatchAssignedToCurrentUser && <span className="text-red-500 text-xs italic ml-1">(Plazo vencido)</span>}
                                     </p>
                                   </div>
                                 </FormItem>
@@ -540,7 +551,7 @@ export default function AvailabilityForm() {
                           onValueChange={field.onChange}
                           value={field.value} 
                           className="flex flex-col space-y-1 sm:flex-row sm:space-y-0 sm:space-x-4"
-                          disabled={isEditing && !canEditCurrentPostulation}
+                          disabled={!canEditCurrentPostulation && isEditing}
                         >
                           <FormItem className="flex items-center space-x-3 space-y-0">
                             <FormControl>
@@ -572,7 +583,7 @@ export default function AvailabilityForm() {
                           placeholder="Ej: Preferencia horaria específica, limitaciones, etc."
                           className="resize-none"
                           {...field}
-                          disabled={isEditing && !canEditCurrentPostulation}
+                          disabled={!canEditCurrentPostulation && isEditing}
                         />
                       </FormControl>
                       <FormMessage />
@@ -582,7 +593,7 @@ export default function AvailabilityForm() {
                 <Button 
                   type="submit" 
                   className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" 
-                  disabled={isLoading || (noClubSelectedOrMatchesConfigured && !!currentActiveClubId) || (isEditing && !canEditCurrentPostulation)}
+                  disabled={isLoading || (noClubSelectedOrMatchesConfigured && !!currentActiveClubId) || (!canEditCurrentPostulation && isEditing)}
                 >
                   {isEditing && canEditCurrentPostulation ? <Edit3 className="mr-2 h-4 w-4" /> : <Send className="mr-2 h-4 w-4" />}
                   {isEditing && canEditCurrentPostulation ? "Actualizar Postulación" : "Enviar Postulación"}
