@@ -146,7 +146,7 @@ export default function AdminPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="dashboard" className="w-full">
+          <Tabs defaultValue="dashboard" className="w-full relative">
             <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-4 mb-6 relative z-10">
                <TabsTrigger value="dashboard">
                 <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
@@ -208,4 +208,3 @@ export default function AdminPage() {
     </div>
   );
 }
-
