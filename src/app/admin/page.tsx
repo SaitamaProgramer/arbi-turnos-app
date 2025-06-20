@@ -161,14 +161,14 @@ export default function AdminPage() {
                 <Info className="mr-2 h-4 w-4" /> Info del Club
               </TabsTrigger>
             </TabsList>
-             <TabsContent value="dashboard">
+             <TabsContent value="dashboard" className="relative z-0">
               <AdminDashboard 
                 clubId={currentClub.id} 
                 allRefereesInClub={refereesInClub}
                 shiftRequestsForClub={requests} 
               />
             </TabsContent>
-            <TabsContent value="assignments"> 
+            <TabsContent value="assignments" className="relative z-0"> 
               <ShiftTable 
                 clubId={currentClub.id}
                 definedMatchesForClub={clubDefinedMatches}
@@ -177,10 +177,10 @@ export default function AdminPage() {
                 initialMatchAssignments={matchAssignments}
               />
             </TabsContent>
-            <TabsContent value="match-manager"> 
+            <TabsContent value="match-manager" className="relative z-0"> 
               <ClubMatchManager clubId={currentClub.id} onMatchesUpdated={refreshClubMatches} />
             </TabsContent>
-            <TabsContent value="club-info">
+            <TabsContent value="club-info" className="relative z-0">
               <Card>
                 <CardHeader>
                   <CardTitle>Información de tu Club</CardTitle>
