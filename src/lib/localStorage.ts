@@ -1,6 +1,7 @@
 
 import type { ShiftRequest, User, Club, ClubSpecificMatch, MatchAssignment } from '@/types';
 import { formatISO, addDays, subDays, parseISO, isBefore, startOfDay } from 'date-fns';
+import SHA256 from 'crypto-js/sha256';
 
 const SHIFT_REQUESTS_KEY = 'arbitros_shift_requests_v5';
 const CLUB_DEFINED_MATCHES_KEY = 'arbitros_club_defined_matches_v2';
@@ -9,14 +10,16 @@ const CLUBS_KEY = 'arbitros_clubs_v1';
 const CURRENT_USER_EMAIL_KEY = 'arbitros_current_user_email_v2';
 const ACTIVE_CLUB_ID_KEY = 'arbitros_active_club_id_v1'; 
 const MATCH_ASSIGNMENTS_KEY = 'arbitros_match_assignments_v1';
-const TEST_DATA_INITIALIZED_KEY = 'arbitros_test_data_initialized_v5'; 
+const TEST_DATA_INITIALIZED_KEY = 'arbitros_test_data_initialized_v6'; 
 
 function initializeWithTestData() {
   if (typeof window === 'undefined' || localStorage.getItem(TEST_DATA_INITIALIZED_KEY)) {
     return;
   }
 
-  console.log("Initializing with V5 test data (detailed matches, more shift requests, specific dates)...");
+  console.log("Initializing with V6 test data (hashed passwords)...");
+  
+  const hashedPassword = SHA256("password").toString();
 
   const club1Id = "club-bh-01";
   const club2Id = "club-rs-02";
@@ -27,14 +30,14 @@ function initializeWithTestData() {
   setItem(CLUBS_KEY, clubs);
 
   const users: User[] = [
-    { id: "adminUser1", name: "Admin Bahía", email: "admin1@example.com", password: "password", role: "admin", administeredClubId: club1Id },
-    { id: "adminUser2", name: "Admin Rosales", email: "admin2@example.com", password: "password", role: "admin", administeredClubId: club2Id },
-    { id: "refUser1", name: "Referee Uno (Bahía)", email: "ref1@example.com", password: "password", role: "referee", memberClubIds: [club1Id] },
-    { id: "refUser2", name: "Referee Dos (Bahía)", email: "ref2@example.com", password: "password", role: "referee", memberClubIds: [club1Id] },
-    { id: "refUser3", name: "Referee Tres (Rosales)", email: "ref3@example.com", password: "password", role: "referee", memberClubIds: [club2Id] },
-    { id: "refUser4", name: "Referee Cuatro (Bahía)", email: "ref4@example.com", password: "password", role: "referee", memberClubIds: [club1Id] },
-    { id: "refUserMulti", name: "Referee MultiClub", email: "refMulti@example.com", password: "password", role: "referee", memberClubIds: [club1Id, club2Id] },
-    { id: "refUser5Bahia", name: "Referee Cinco (Bahía)", email: "ref5@example.com", password: "password", role: "referee", memberClubIds: [club1Id] },
+    { id: "adminUser1", name: "Admin Bahía", email: "admin1@example.com", password: hashedPassword, role: "admin", administeredClubId: club1Id },
+    { id: "adminUser2", name: "Admin Rosales", email: "admin2@example.com", password: hashedPassword, role: "admin", administeredClubId: club2Id },
+    { id: "refUser1", name: "Referee Uno (Bahía)", email: "ref1@example.com", password: hashedPassword, role: "referee", memberClubIds: [club1Id] },
+    { id: "refUser2", name: "Referee Dos (Bahía)", email: "ref2@example.com", password: hashedPassword, role: "referee", memberClubIds: [club1Id] },
+    { id: "refUser3", name: "Referee Tres (Rosales)", email: "ref3@example.com", password: hashedPassword, role: "referee", memberClubIds: [club2Id] },
+    { id: "refUser4", name: "Referee Cuatro (Bahía)", email: "ref4@example.com", password: hashedPassword, role: "referee", memberClubIds: [club1Id] },
+    { id: "refUserMulti", name: "Referee MultiClub", email: "refMulti@example.com", password: hashedPassword, role: "referee", memberClubIds: [club1Id, club2Id] },
+    { id: "refUser5Bahia", name: "Referee Cinco (Bahía)", email: "ref5@example.com", password: hashedPassword, role: "referee", memberClubIds: [club1Id] },
   ];
   setItem(USERS_KEY, users);
   
@@ -139,7 +142,7 @@ function initializeWithTestData() {
   setItem(MATCH_ASSIGNMENTS_KEY, matchAssignments);
 
   localStorage.setItem(TEST_DATA_INITIALIZED_KEY, 'true');
-  console.log("Test data V5 (detailed dates, more requests) initialized.");
+  console.log("Test data V6 (hashed passwords) initialized.");
 }
 
 
@@ -225,17 +228,18 @@ export const addUser = (
 
 
   const userId = crypto.randomUUID();
+  const hashedPassword = SHA256(userData.password).toString();
   let newUser: User; let newClub: Club | undefined;
   if (userData.role === 'admin') {
     if (!userData.clubName) return { error: "El nombre del club es requerido para administradores." };
     newClub = addClub(userData.clubName, userId);
-    newUser = { id: userId, name: userData.name, email: userData.email, password: userData.password, role: 'admin', administeredClubId: newClub.id };
+    newUser = { id: userId, name: userData.name, email: userData.email, password: hashedPassword, role: 'admin', administeredClubId: newClub.id };
     users.push(newUser);
   } else { 
     if (!userData.clubIdToJoin) return { error: "El código de club es requerido para árbitros." };
     const clubToJoin = findClubById(userData.clubIdToJoin);
     if (!clubToJoin) return { error: "El código de club no es válido o el club no existe." };
-    newUser = { id: userId, name: userData.name, email: userData.email, password: userData.password, role: 'referee', memberClubIds: [userData.clubIdToJoin] };
+    newUser = { id: userId, name: userData.name, email: userData.email, password: hashedPassword, role: 'referee', memberClubIds: [userData.clubIdToJoin] };
     users.push(newUser);
   }
   saveUsers(users);
@@ -285,29 +289,9 @@ export const updateShiftRequestDetails = (
   const originalRequest = requests[requestIndex];
   if (originalRequest.userEmail !== userEmail || originalRequest.status !== 'pending') return null;
   
-  const isOriginalPostulationEditableByDate = originalRequest.selectedMatches.every(match => isMatchEditable(match.date));
-  const isNewPostulationEditableByDate = newData.selectedMatches.every(match => isMatchEditable(match.date));
-
-  // Check if any of original selected matches are already assigned to this user
-  const isAnyOriginalMatchAssignedToUser = originalRequest.selectedMatches.some(match =>
-    allAssignmentsForUserInClub.some(asg => asg.matchId === match.id)
-  );
-  
-  // If any original match was assigned to user, no edits allowed
-  if (isAnyOriginalMatchAssignedToUser) {
-    console.warn("Attempted to edit a postulation where one or more matches are already assigned to the user.");
+  if (!isPostulationEditable(originalRequest.selectedMatches, allAssignmentsForUserInClub)) {
+    console.warn("Attempted to edit a postulation that is already locked due to date or assignment.");
     return null;
-  }
-  
-  // If original postulation wasn't editable by date, and they are trying to change matches, deny
-  if (!isOriginalPostulationEditableByDate && JSON.stringify(originalRequest.selectedMatches.map(m=>m.id).sort()) !== JSON.stringify(newData.selectedMatches.map(m=>m.id).sort())) {
-     console.warn("Attempted to change matches in a postulation that is not editable by date.");
-     return null;
-  }
-  // If new selection makes it uneditable by date, deny (this might be redundant if the form itself prevents selecting such matches)
-  if (!isNewPostulationEditableByDate && JSON.stringify(originalRequest.selectedMatches.map(m=>m.id).sort()) !== JSON.stringify(newData.selectedMatches.map(m=>m.id).sort())) {
-     console.warn("Attempted to update postulation to include matches that are too close or past.");
-     return null;
   }
 
   const updatedRequest: ShiftRequest = {
@@ -377,7 +361,6 @@ export const assignRefereeToMatch = (
 
   for (const currentAsg of refereeCurrentAssignmentsInClub) {
     if (currentAsg.matchId === matchId) { 
-      // If trying to assign same ref to same match (e.g. re-confirming or UI glitch), it's fine or will be an update.
       continue;
     }
     
@@ -453,22 +436,21 @@ export const isPostulationEditable = (
     selectedMatches: ClubSpecificMatch[],
     assignmentsForThisUserInThisClub: MatchAssignment[]
 ): boolean => {
-  if (!selectedMatches || selectedMatches.length === 0) return true; // No matches selected, can always "edit" (i.e. start a new one)
+  if (!selectedMatches || selectedMatches.length === 0) return true;
 
-  // 1. Check date-based editability for all matches
-  const allMatchesEditableByDate = selectedMatches.every(match => isMatchEditable(match.date));
-  if (!allMatchesEditableByDate) {
-    return false;
-  }
-
-  // 2. Check if any of the selected matches are already assigned to this user
+  // 1. Check if any of the selected matches are already assigned to this user
   const isAnySelectedMatchAssignedToUser = selectedMatches.some(selectedMatch =>
     assignmentsForThisUserInThisClub.some(assignment => assignment.matchId === selectedMatch.id)
   );
   if (isAnySelectedMatchAssignedToUser) {
     return false;
   }
+
+  // 2. Check date-based editability for all matches
+  const allMatchesEditableByDate = selectedMatches.every(match => isMatchEditable(match.date));
+  if (!allMatchesEditableByDate) {
+    return false;
+  }
   
   return true; // All checks passed
 };
-

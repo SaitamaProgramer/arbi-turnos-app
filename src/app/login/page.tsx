@@ -20,6 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LogIn } from "lucide-react";
 import { findUserByEmail, setCurrentUserEmail, setActiveClubId } from "@/lib/localStorage";
 import { useRouter } from "next/navigation";
+import SHA256 from 'crypto-js/sha256';
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),
@@ -42,8 +43,9 @@ export default function LoginPage() {
 
   function onSubmit(data: LoginFormValues) {
     const user = findUserByEmail(data.email);
+    const hashedInputPassword = SHA256(data.password).toString();
 
-    if (user && user.password === data.password) { // VERY INSECURE: for demo only
+    if (user && user.password === hashedInputPassword) { 
       setCurrentUserEmail(user.email);
       
       if (user.role === 'admin' && user.administeredClubId) {
