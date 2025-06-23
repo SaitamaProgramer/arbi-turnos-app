@@ -26,7 +26,9 @@ import { registerUser } from "@/lib/actions";
 const registerFormSchemaBase = z.object({
   name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
   email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),
-  password: z.string().min(6, { message: "La contraseña debe tener al menos 6 caracteres." }),
+  password: z.string()
+    .min(6, { message: "La contraseña debe tener al menos 6 caracteres." })
+    .regex(/^(?=.*[a-zA-Z])(?=.*\d).*$/, { message: "La contraseña debe contener al menos una letra y un número." }),
   confirmPassword: z.string(),
   role: z.enum(["admin", "referee"], { required_error: "Debes seleccionar un rol." }),
 });
