@@ -4,6 +4,7 @@ import { UsersRound, LogIn, UserPlus, LogOut, ShieldCheck } from 'lucide-react';
 import { getUserFromSession } from '@/lib/session';
 import { Button } from '@/components/ui/button';
 import { logout } from '@/lib/actions';
+import { HelpDialog } from './help-dialog';
 
 async function LogoutButton() {
   return (
@@ -26,7 +27,7 @@ export default async function Navbar() {
           <UsersRound size={28} strokeWidth={2.5} />
           <h1 className="text-2xl font-bold">ArbiTurnos</h1>
         </Link>
-        <div className="space-x-2 sm:space-x-4 flex items-center">
+        <div className="space-x-1 sm:space-x-2 flex items-center">
           {currentUser && (
             <Link href="/" className="text-foreground hover:text-primary transition-colors font-medium text-sm sm:text-base">
               Disponibilidad
@@ -40,6 +41,8 @@ export default async function Navbar() {
             </Link>
           )}
           
+          <HelpDialog />
+
           {currentUser ? (
             <>
               <span className="text-sm text-muted-foreground hidden sm:inline">Hola, {currentUser.name.split(' ')[0]}</span>
