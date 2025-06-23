@@ -24,7 +24,7 @@ export default async function Navbar() {
       <nav className="container mx-auto px-4 py-3 flex justify-between items-center">
         <Link href="/" className="flex items-center gap-2 text-primary hover:text-primary/80 transition-colors">
           <UsersRound size={28} strokeWidth={2.5} />
-          <h1 className="text-2xl font-bold">Arbitros Turnos</h1>
+          <h1 className="text-2xl font-bold">ArbiTurnos</h1>
         </Link>
         <div className="space-x-2 sm:space-x-4 flex items-center">
           {currentUser && (
