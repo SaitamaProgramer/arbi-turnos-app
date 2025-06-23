@@ -71,7 +71,7 @@ export async function registerUser(payload: RegisterUserPayload) {
                 });
                 await tx.execute({
                     sql: 'INSERT INTO clubs (id, name, admin_user_id) VALUES (?, ?, ?)',
-                    args: [newClubId, clubName, newUserId]
+                    args: [newClubId, name, newUserId]
                 });
 
             } else { // role === 'referee'
@@ -152,13 +152,20 @@ export async function logout() {
 
 // Helper to cast rows to a specific type
 function rowsToType<T>(rows: any[]): T[] {
-    return rows as T[];
+    return rows.map(row => {
+        const newRow: { [key: string]: any } = {};
+        for (const key in row) {
+            const camelCaseKey = key.replace(/_([a-z])/g, g => g[1].toUpperCase());
+            newRow[camelCaseKey] = row[key];
+        }
+        return newRow as T;
+    });
 }
 
 export async function getAdminPageData(clubId: string) {
     try {
         const clubResult = await db.execute({ sql: 'SELECT * FROM clubs WHERE id = ?', args: [clubId] });
-        const club = clubResult.rows[0] as Club;
+        const club = rowsToType<Club>(clubResult.rows)[0];
         if (!club) return null;
 
         const refereesResult = await db.execute({
@@ -192,7 +199,7 @@ export async function getAdminPageData(clubId: string) {
         const definedMatches = rowsToType<ClubSpecificMatch>(definedMatchesResult.rows);
         
         const matchAssignmentsResult = await db.execute({
-            sql: 'SELECT match_id, assigned_referee_id as assignedRefereeId FROM match_assignments WHERE club_id = ?',
+            sql: 'SELECT match_id, assigned_referee_id FROM match_assignments WHERE club_id = ?',
             args: [clubId]
         });
         const matchAssignments = rowsToType<Omit<MatchAssignment, 'clubId' | 'assignedAt' | 'id'>>(matchAssignmentsResult.rows);
@@ -203,17 +210,19 @@ export async function getAdminPageData(clubId: string) {
             const match = definedMatches.find(m => m.id === row.match_id);
             if (!match) continue;
 
-            if (requestsMap.has(row.id as string)) {
-                requestsMap.get(row.id as string)!.selectedMatches.push(match);
+            const typedRow = rowsToType<any>([row])[0];
+
+            if (requestsMap.has(typedRow.id as string)) {
+                requestsMap.get(typedRow.id as string)!.selectedMatches.push(match);
             } else {
-                requestsMap.set(row.id as string, {
-                    id: row.id as string,
-                    userId: row.user_id as string,
-                    clubId: row.club_id as string,
-                    hasCar: !!row.has_car,
-                    notes: row.notes as string,
-                    status: row.status as 'pending' | 'completed',
-                    submittedAt: row.submitted_at as string,
+                requestsMap.set(typedRow.id as string, {
+                    id: typedRow.id as string,
+                    userId: typedRow.userId as string,
+                    clubId: typedRow.clubId as string,
+                    hasCar: !!typedRow.hasCar,
+                    notes: typedRow.notes as string,
+                    status: typedRow.status as 'pending' | 'completed',
+                    submittedAt: typedRow.submittedAt as string,
                     selectedMatches: [match],
                 });
             }
@@ -284,7 +293,7 @@ export async function getAvailabilityFormData(userId: string) {
              const matches = rowsToType<ClubSpecificMatch>(matchesResult.rows);
              
              const assignmentsResult = await db.execute({
-                 sql: 'SELECT match_id as matchId, assigned_referee_id as assignedRefereeId FROM match_assignments WHERE club_id = ? AND assigned_referee_id = ?',
+                 sql: 'SELECT match_id, assigned_referee_id FROM match_assignments WHERE club_id = ? AND assigned_referee_id = ?',
                  args: [club.id, userId]
              });
              const assignments = rowsToType<MatchAssignment>(assignmentsResult.rows);
@@ -293,7 +302,7 @@ export async function getAvailabilityFormData(userId: string) {
                  sql: `SELECT * FROM shift_requests WHERE user_id = ? AND club_id = ? AND status = 'pending'`,
                  args: [userId, club.id]
              });
-             const postulationRow = postulationResult.rows[0] as ShiftRequest | undefined;
+             const postulationRow = rowsToType<ShiftRequest>(postulationResult.rows)[0];
              
              let postulationWithMatches: ShiftRequestWithMatches | null = null;
              if(postulationRow) {
@@ -361,7 +370,7 @@ export async function submitAvailability(payload: z.infer<typeof availabilitySch
         try {
             await tx.execute({
                 sql: 'INSERT INTO shift_requests (id, user_id, club_id, has_car, notes, status, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                args: [requestId, userId, selectedClubId, hasCar, notes, 'pending', submittedAt]
+                args: [requestId, userId, selectedClubId, hasCar ? 1 : 0, notes, 'pending', submittedAt]
             });
             for (const matchId of selectedMatchIds) {
                 await tx.execute({
@@ -398,7 +407,7 @@ export async function updateAvailability(requestId: string, payload: z.infer<typ
             sql: `SELECT * FROM shift_requests WHERE id = ? AND user_id = ?`,
             args: [requestId, userId]
         });
-        const request = requestResult.rows[0] as ShiftRequest | undefined;
+        const request = rowsToType<ShiftRequest>(requestResult.rows)[0];
 
         if (!request) {
             return { error: 'Postulación no encontrada o no tienes permiso para editarla.' };
@@ -418,7 +427,7 @@ export async function updateAvailability(requestId: string, payload: z.infer<typ
             const matchesInRequest = rowsToType<ClubSpecificMatch>(matchesInRequestDataResult.rows);
 
             const assignmentsForUserResult = await db.execute({
-                sql: 'SELECT match_id as matchId, assigned_referee_id as assignedRefereeId FROM match_assignments WHERE club_id = ? AND assigned_referee_id = ?',
+                sql: 'SELECT match_id, assigned_referee_id FROM match_assignments WHERE club_id = ? AND assigned_referee_id = ?',
                 args: [selectedClubId, userId]
             });
             const assignmentsForUser = rowsToType<MatchAssignment>(assignmentsForUserResult.rows);
@@ -432,7 +441,7 @@ export async function updateAvailability(requestId: string, payload: z.infer<typ
         try {
             await tx.execute({
                 sql: 'UPDATE shift_requests SET has_car = ?, notes = ?, submitted_at = ? WHERE id = ?',
-                args: [hasCar, notes, new Date().toISOString(), requestId]
+                args: [hasCar ? 1 : 0, notes, new Date().toISOString(), requestId]
             });
             await tx.execute({
                 sql: 'DELETE FROM shift_request_matches WHERE request_id = ?',
@@ -464,7 +473,7 @@ export async function assignRefereeToMatch(clubId: string, matchId: string, refe
             sql: 'SELECT * FROM club_matches WHERE id = ?',
             args: [matchId]
         });
-        const matchToAssign = matchToAssignResult.rows[0] as ClubSpecificMatch | undefined;
+        const matchToAssign = rowsToType<ClubSpecificMatch>(matchToAssignResult.rows)[0];
         if (!matchToAssign) {
             return { error: "El partido a asignar no fue encontrado." };
         }
@@ -479,8 +488,9 @@ export async function assignRefereeToMatch(clubId: string, matchId: string, refe
             args: [refereeId, clubId]
         });
 
-        for (const currentAsg of refereeAssignmentsResult.rows) {
-             if (currentAsg.match_date === matchToAssign.date && currentAsg.match_time === matchToAssign.time) {
+        for (const row of refereeAssignmentsResult.rows) {
+             const currentAsg = rowsToType<any>([row])[0];
+             if (currentAsg.matchDate === matchToAssign.date && currentAsg.matchTime === matchToAssign.time) {
                 return { error: `Este árbitro ya está asignado a "${currentAsg.description}" a la misma fecha y hora.` };
              }
         }
@@ -522,5 +532,3 @@ export async function unassignRefereeFromMatch(clubId: string, matchId: string) 
         return { error: 'No se pudo quitar la asignación.' };
     }
 }
-
-    

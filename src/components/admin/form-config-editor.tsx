@@ -96,7 +96,7 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
 
   const addNewMatchField = () => {
     append({ 
-      id: crypto.randomUUID(), 
+      id: `match_${crypto.randomUUID()}`, 
       description: "", 
       date: new Date(), 
       time: "12:00", 

@@ -106,6 +106,7 @@ export default function AvailabilityForm({ initialData, user }: AvailabilityForm
 
   const handleClubChange = (newClubId: string) => {
     setActiveClubId(newClubId);
+    form.setValue('selectedClubId', newClubId);
     setupForm(newClubId);
   };
 

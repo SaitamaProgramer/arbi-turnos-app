@@ -1,5 +1,4 @@
 
-
 export interface ClubSpecificMatch {
   id: string;
   clubId: string;
@@ -13,7 +12,7 @@ export interface ShiftRequest {
   id: string;
   userId: string;
   clubId: string; 
-  hasCar: boolean;
+  hasCar: boolean; // stored as INTEGER in DB, but represented as boolean here
   notes: string;
   status: 'pending' | 'completed'; 
   submittedAt: string; 

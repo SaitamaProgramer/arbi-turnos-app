@@ -1,3 +1,4 @@
+
 import { createClient } from '@libsql/client';
 import 'dotenv/config';
 
@@ -10,14 +11,17 @@ declare global {
   var db: ReturnType<typeof createClient> | undefined;
 }
 
-const url = process.env.TURSO_DATABASE_URL;
+let url = process.env.TURSO_DATABASE_URL;
 const authToken = process.env.TURSO_AUTH_TOKEN;
 
-if (!url) {
-  throw new Error('TURSO_DATABASE_URL environment variable is not defined');
+// Developer-friendly fallback to a local file database if Turso URL is not set or is a placeholder
+if (!url || url.includes('your-db-name')) {
+  console.log('TURSO_DATABASE_URL not set or is a placeholder, falling back to local file: arbitros.db');
+  url = 'file:arbitros.db';
 }
 
-if (!authToken && process.env.NODE_ENV === 'production') {
+// In production, if not using a local file DB, the auth token is required.
+if (!authToken && process.env.NODE_ENV === 'production' && !url.startsWith('file:')) {
     throw new Error('TURSO_AUTH_TOKEN environment variable is not defined for production');
 }
 
@@ -29,4 +33,4 @@ export const db =
 
 if (process.env.NODE_ENV !== 'production') global.db = db;
 
-console.log(`Database connected via Turso.`);
+console.log(`Database client configured for: ${url.startsWith('file:') ? 'Local SQLite File' : 'Turso'}`);

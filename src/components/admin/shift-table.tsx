@@ -30,7 +30,8 @@ import {
   unassignRefereeFromMatch,
 } from "@/lib/actions"; 
 import { UserCheck, UserPlus, Edit, Trash2, Users, CalendarCheck2, AlertTriangle, Loader2 } from "lucide-react";
-import { useState, useMemo, useTransition, useRouter } from "react";
+import { useState, useMemo, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { format, parseISO } from 'date-fns';
 
 interface ShiftTableProps {
@@ -68,7 +69,7 @@ export default function ShiftTable({
   
   // These props will not update on their own after a server action. 
   // We use the initial props to populate state that we can then manage on the client.
-  // The router.refresh() will cause the parent server component to re-render and pass new initial props.
+  // The router.refresh() will cause the parent server component to re-render and pass new props.
   const [definedMatches, setDefinedMatches] = useState(initialDefinedMatches);
   const [shiftRequests, setShiftRequests] = useState(initialShiftRequests);
   const [assignments, setAssignments] = useState(initialMatchAssignments);
