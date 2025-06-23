@@ -1,5 +1,5 @@
-# Firebase Studio
+# ArbiTurnos
 
-This is a NextJS starter in Firebase Studio.
+Aplicación para la gestión de turnos de árbitros. Construida con Next.js en Firebase Studio.
 
-To get started, take a look at src/app/page.tsx.
+Para empezar, echa un vistazo a `src/app/page.tsx`.
