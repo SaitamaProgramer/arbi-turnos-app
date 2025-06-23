@@ -19,9 +19,9 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { UserPlus, ShieldCheck, Briefcase } from "lucide-react";
-import { addUser, setCurrentUserEmail, setActiveClubId, findUserByEmail } from "@/lib/localStorage";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { registerUser } from "@/lib/actions";
 
 const registerFormSchemaBase = z.object({
   name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
@@ -61,6 +61,7 @@ export default function RegisterPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [selectedRole, setSelectedRole] = useState<'admin' | 'referee' | undefined>(undefined);
+  const [isPending, startTransition] = useTransition();
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerFormSchema),
@@ -75,43 +76,23 @@ export default function RegisterPage() {
     },
   });
 
-  function onSubmit(data: RegisterFormValues) {
-    const result = addUser({
-      name: data.name,
-      email: data.email,
-      password: data.password,
-      role: data.role,
-      clubName: data.role === 'admin' ? data.clubName : undefined,
-      clubIdToJoin: data.role === 'referee' ? data.clubIdToJoin : undefined,
-    });
-    
-    if (result.error) {
-      toast({
-        title: "Error de Registro",
-        description: result.error,
-        variant: "destructive",
-      });
-    } else if (result.user) {
-      setCurrentUserEmail(result.user.email);
-      // For newly registered users, set their active club context
-      if (result.user.role === 'admin' && result.user.administeredClubId) {
-        setActiveClubId(result.user.administeredClubId);
-      } else if (result.user.role === 'referee' && result.user.memberClubIds && result.user.memberClubIds.length > 0) {
-        setActiveClubId(result.user.memberClubIds[0]); // Default to first club
-      }
-      
-      toast({
-        title: "Registro Exitoso",
-        description: `Tu cuenta como ${data.role === 'admin' ? `administrador del club ${result.club?.name}` : 'árbitro'} ha sido creada. ${data.role === 'admin' ? `El código de tu club es: ${result.club?.id}` : ''} Serás redirigido.`,
-        duration: data.role === 'admin' ? 10000 : 5000,
-      });
-      
-      if (result.user.role === 'admin') {
-        router.push('/admin');
+  async function onSubmit(data: RegisterFormValues) {
+    startTransition(async () => {
+      const result = await registerUser(data);
+      if (result?.error) {
+        toast({
+          title: "Error de Registro",
+          description: result.error,
+          variant: "destructive",
+        });
       } else {
-        router.push('/');
+        toast({
+          title: "Registro Exitoso",
+          description: "Tu cuenta ha sido creada. Serás redirigido.",
+        });
+        router.refresh();
       }
-    }
+    });
   }
 
   return (
@@ -251,9 +232,9 @@ export default function RegisterPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={!selectedRole}>
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={!selectedRole || isPending}>
                 <UserPlus className="mr-2 h-4 w-4" />
-                Registrarse
+                {isPending ? 'Registrando...' : 'Registrarse'}
               </Button>
             </form>
           </Form>

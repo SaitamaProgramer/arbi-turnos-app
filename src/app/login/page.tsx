@@ -18,9 +18,10 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { LogIn } from "lucide-react";
-import { findUserByEmail, setCurrentUserEmail, setActiveClubId } from "@/lib/localStorage";
 import { useRouter } from "next/navigation";
-import SHA256 from 'crypto-js/sha256';
+import { login } from "@/lib/actions";
+import { useTransition } from "react";
+
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),
@@ -32,6 +33,7 @@ type LoginFormValues = z.infer<typeof loginFormSchema>;
 export default function LoginPage() {
   const { toast } = useToast();
   const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -41,53 +43,24 @@ export default function LoginPage() {
     },
   });
 
-  function onSubmit(data: LoginFormValues) {
-    const user = findUserByEmail(data.email);
-    const hashedInputPassword = SHA256(data.password).toString();
-
-    if (user && user.password === hashedInputPassword) { 
-      setCurrentUserEmail(user.email);
-      
-      if (user.role === 'admin' && user.administeredClubId) {
-        setActiveClubId(user.administeredClubId); // Admin operates on their administered club
-        router.push('/admin');
-      } else if (user.role === 'referee' && user.memberClubIds && user.memberClubIds.length > 0) {
-        // For referees, default to the first club in their list.
-        // A dedicated club selection UI would be better for multiple clubs.
-        setActiveClubId(user.memberClubIds[0]); 
-        router.push('/');
-      } else if (user.role === 'referee' && (!user.memberClubIds || user.memberClubIds.length === 0)) {
-         toast({
-            title: "Error de Configuración",
-            description: "Este árbitro no está asociado a ningún club.",
-            variant: "destructive",
-          });
-         setCurrentUserEmail(null); // Log out user
-         return;
-      }
-       else {
-        // Fallback or error if user role/club setup is unexpected
+  async function onSubmit(data: LoginFormValues) {
+    startTransition(async () => {
+      const result = await login(data);
+      if (result?.error) {
         toast({
-          title: "Error de Configuración",
-          description: "No se pudo determinar tu rol o club. Contacta al soporte.",
+          title: "Error de Inicio de Sesión",
+          description: result.error,
           variant: "destructive",
         });
-        setCurrentUserEmail(null); // Log out user
-        return;
+      } else {
+         toast({
+          title: "Inicio de Sesión Exitoso",
+        });
+        // The server action will handle redirection via a cookie, 
+        // so we just need to refresh the page to let the new layout take effect.
+        router.refresh();
       }
-      
-      toast({
-        title: "Inicio de Sesión Exitoso",
-        description: `Bienvenido de nuevo, ${user.name}!`,
-      });
-
-    } else {
-      toast({
-        title: "Error de Inicio de Sesión",
-        description: "Correo electrónico o contraseña incorrectos.",
-        variant: "destructive",
-      });
-    }
+    });
   }
 
   return (
@@ -131,9 +104,9 @@ export default function LoginPage() {
                   </FormItem>
                 )}
               />
-              <Button type="submit" className="w-full bg-primary hover:bg-primary/90">
+              <Button type="submit" className="w-full bg-primary hover:bg-primary/90" disabled={isPending}>
                 <LogIn className="mr-2 h-4 w-4" />
-                Acceder
+                {isPending ? "Accediendo..." : "Acceder"}
               </Button>
             </form>
           </Form>

@@ -1,173 +1,73 @@
--- SQL Schema for the Arbitros Turnos Application
--- This schema translates the localStorage object structure into a relational database model.
 
--- -----------------------------------------------------
--- Table `Clubs`
--- Stores information about each club.
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `Clubs` (
-  `id` VARCHAR(255) NOT NULL,
-  `name` VARCHAR(255) NOT NULL,
-  `admin_user_id` VARCHAR(255) NOT NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE INDEX `admin_user_id_UNIQUE` (`admin_user_id` ASC)
-) ENGINE = InnoDB;
+-- Users Table: Stores user information, including credentials and role.
+CREATE TABLE IF NOT EXISTS users (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL UNIQUE,
+    password TEXT NOT NULL, -- Stores hashed password
+    role TEXT NOT NULL CHECK(role IN ('admin', 'referee'))
+);
 
+-- Clubs Table: Stores information about each club.
+CREATE TABLE IF NOT EXISTS clubs (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    admin_user_id TEXT NOT NULL,
+    FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE CASCADE
+);
 
--- -----------------------------------------------------
--- Table `Users`
--- Stores user accounts, both for referees and administrators.
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `Users` (
-  `id` VARCHAR(255) NOT NULL,
-  `name` VARCHAR(255) NOT NULL,
-  `email` VARCHAR(255) NOT NULL,
-  `password_hash` VARCHAR(255) NOT NULL,
-  `role` ENUM('admin', 'referee') NOT NULL,
-  `administered_club_id` VARCHAR(255) NULL,
-  PRIMARY KEY (`id`),
-  UNIQUE INDEX `email_UNIQUE` (`email` ASC),
-  INDEX `fk_Users_Clubs1_idx` (`administered_club_id` ASC),
-  CONSTRAINT `fk_Users_Clubs1`
-    FOREIGN KEY (`administered_club_id`)
-    REFERENCES `Clubs` (`id`)
-    ON DELETE SET NULL
-    ON UPDATE CASCADE
-) ENGINE = InnoDB;
+-- User_Clubs_Membership Table: A join table for the many-to-many relationship between users (referees) and clubs.
+CREATE TABLE IF NOT EXISTS user_clubs_membership (
+    user_id TEXT NOT NULL,
+    club_id TEXT NOT NULL,
+    PRIMARY KEY (user_id, club_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
+);
 
--- We can now set the foreign key from Clubs to Users, as both tables exist.
-ALTER TABLE `Clubs` 
-ADD INDEX `fk_Clubs_Users1_idx` (`admin_user_id` ASC);
-ALTER TABLE `Clubs` 
-ADD CONSTRAINT `fk_Clubs_Users1`
-  FOREIGN KEY (`admin_user_id`)
-  REFERENCES `Users` (`id`)
-  ON DELETE RESTRICT
-  ON UPDATE CASCADE;
+-- Club_Matches Table: Defines specific matches/shifts available for a club.
+CREATE TABLE IF NOT EXISTS club_matches (
+    id TEXT PRIMARY KEY,
+    club_id TEXT NOT NULL,
+    description TEXT NOT NULL,
+    date TEXT NOT NULL, -- ISO Date string 'YYYY-MM-DD'
+    time TEXT NOT NULL, -- Time string 'HH:MM'
+    location TEXT NOT NULL,
+    FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
+);
 
+-- Shift_Requests Table: Stores a referee's application for shifts within a club.
+CREATE TABLE IF NOT EXISTS shift_requests (
+    id TEXT PRIMARY KEY,
+    user_id TEXT NOT NULL,
+    club_id TEXT NOT NULL,
+    has_car BOOLEAN NOT NULL,
+    notes TEXT,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK(status IN ('pending', 'completed')),
+    submitted_at TEXT NOT NULL, -- ISO DateTime string
+    UNIQUE(user_id, club_id, status), -- A user can only have one pending request per club
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
+);
 
--- -----------------------------------------------------
--- Table `UserClubMemberships`
--- Junction table for the many-to-many relationship between Users (referees) and Clubs.
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `UserClubMemberships` (
-  `user_id` VARCHAR(255) NOT NULL,
-  `club_id` VARCHAR(255) NOT NULL,
-  PRIMARY KEY (`user_id`, `club_id`),
-  INDEX `fk_Users_has_Clubs_Clubs1_idx` (`club_id` ASC),
-  INDEX `fk_Users_has_Clubs_Users_idx` (`user_id` ASC),
-  CONSTRAINT `fk_Users_has_Clubs_Users`
-    FOREIGN KEY (`user_id`)
-    REFERENCES `Users` (`id`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
-  CONSTRAINT `fk_Users_has_Clubs_Clubs1`
-    FOREIGN KEY (`club_id`)
-    REFERENCES `Clubs` (`id`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE
-) ENGINE = InnoDB;
+-- Shift_Request_Matches Table: A join table for the many-to-many relationship between a shift request and the matches it applies to.
+CREATE TABLE IF NOT EXISTS shift_request_matches (
+    request_id TEXT NOT NULL,
+    match_id TEXT NOT NULL,
+    PRIMARY KEY (request_id, match_id),
+    FOREIGN KEY (request_id) REFERENCES shift_requests(id) ON DELETE CASCADE,
+    FOREIGN KEY (match_id) REFERENCES club_matches(id) ON DELETE CASCADE
+);
 
 
--- -----------------------------------------------------
--- Table `ClubSpecificMatches`
--- Stores the specific matches/shifts defined by a club administrator.
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `ClubSpecificMatches` (
-  `id` VARCHAR(255) NOT NULL,
-  `club_id` VARCHAR(255) NOT NULL,
-  `description` TEXT NOT NULL,
-  `match_date` DATE NOT NULL,
-  `match_time` TIME NOT NULL,
-  `location` VARCHAR(255) NOT NULL,
-  PRIMARY KEY (`id`),
-  INDEX `fk_ClubSpecificMatches_Clubs1_idx` (`club_id` ASC),
-  CONSTRAINT `fk_ClubSpecificMatches_Clubs1`
-    FOREIGN KEY (`club_id`)
-    REFERENCES `Clubs` (`id`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE
-) ENGINE = InnoDB;
-
-
--- -----------------------------------------------------
--- Table `ShiftRequests`
--- Stores a referee's postulation (availability submission).
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `ShiftRequests` (
-  `id` VARCHAR(255) NOT NULL,
-  `user_id` VARCHAR(255) NOT NULL,
-  `club_id` VARCHAR(255) NOT NULL,
-  `has_car` TINYINT NOT NULL,
-  `notes` TEXT NULL,
-  `status` ENUM('pending', 'completed') NOT NULL DEFAULT 'pending',
-  `submitted_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`id`),
-  INDEX `fk_ShiftRequests_Users1_idx` (`user_id` ASC),
-  INDEX `fk_ShiftRequests_Clubs1_idx` (`club_id` ASC),
-  CONSTRAINT `fk_ShiftRequests_Users1`
-    FOREIGN KEY (`user_id`)
-    REFERENCES `Users` (`id`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
-  CONSTRAINT `fk_ShiftRequests_Clubs1`
-    FOREIGN KEY (`club_id`)
-    REFERENCES `Clubs` (`id`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE
-) ENGINE = InnoDB;
-
-
--- -----------------------------------------------------
--- Table `ShiftRequestMatches`
--- Junction table for the many-to-many relationship between a ShiftRequest and the specific matches a referee applied for.
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `ShiftRequestMatches` (
-  `shift_request_id` VARCHAR(255) NOT NULL,
-  `match_id` VARCHAR(255) NOT NULL,
-  PRIMARY KEY (`shift_request_id`, `match_id`),
-  INDEX `fk_ShiftRequests_has_ClubSpecificMatches_ClubSpecificMatches_idx` (`match_id` ASC),
-  INDEX `fk_ShiftRequests_has_ClubSpecificMatches_ShiftRequests1_idx` (`shift_request_id` ASC),
-  CONSTRAINT `fk_ShiftRequests_has_ClubSpecificMatches_ShiftRequests1`
-    FOREIGN KEY (`shift_request_id`)
-    REFERENCES `ShiftRequests` (`id`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
-  CONSTRAINT `fk_ShiftRequests_has_ClubSpecificMatches_ClubSpecificMatches1`
-    FOREIGN KEY (`match_id`)
-    REFERENCES `ClubSpecificMatches` (`id`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE
-) ENGINE = InnoDB;
-
-
--- -----------------------------------------------------
--- Table `MatchAssignments`
--- Stores the definitive assignment of a referee to a specific match.
--- A match can only have one referee assigned in this model, so match_id is the PRIMARY KEY.
--- -----------------------------------------------------
-CREATE TABLE IF NOT EXISTS `MatchAssignments` (
-  `match_id` VARCHAR(255) NOT NULL,
-  `assigned_referee_id` VARCHAR(255) NOT NULL,
-  `club_id` VARCHAR(255) NOT NULL COMMENT 'Included for easier querying, though redundant if match_id is a FK.',
-  `assigned_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  PRIMARY KEY (`match_id`),
-  INDEX `fk_MatchAssignments_Users1_idx` (`assigned_referee_id` ASC),
-  INDEX `fk_MatchAssignments_Clubs1_idx` (`club_id` ASC),
-  CONSTRAINT `fk_MatchAssignments_ClubSpecificMatches1`
-    FOREIGN KEY (`match_id`)
-    REFERENCES `ClubSpecificMatches` (`id`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
-  CONSTRAINT `fk_MatchAssignments_Users1`
-    FOREIGN KEY (`assigned_referee_id`)
-    REFERENCES `Users` (`id`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE,
-  CONSTRAINT `fk_MatchAssignments_Clubs1`
-    FOREIGN KEY (`club_id`)
-    REFERENCES `Clubs` (`id`)
-    ON DELETE CASCADE
-    ON UPDATE CASCADE
-) ENGINE = InnoDB;
-
+-- Match_Assignments Table: Stores the final assignment of a referee to a specific match.
+CREATE TABLE IF NOT EXISTS match_assignments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    club_id TEXT NOT NULL,
+    match_id TEXT NOT NULL UNIQUE, -- A match can only have one assignment
+    assigned_referee_id TEXT NOT NULL,
+    assigned_at TEXT NOT NULL, -- ISO DateTime string
+    FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
+    FOREIGN KEY (match_id) REFERENCES club_matches(id) ON DELETE CASCADE,
+    FOREIGN KEY (assigned_referee_id) REFERENCES users(id) ON DELETE CASCADE
+);

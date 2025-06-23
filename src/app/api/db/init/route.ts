@@ -12,7 +12,9 @@ export async function GET() {
     
     const schema = fs.readFileSync(schemaPath, 'utf-8');
     
-    db.exec(schema);
+    // For @libsql/client, we need to split statements and run them in a batch.
+    const statements = schema.split(';').filter(s => s.trim().length > 0);
+    await db.batch(statements);
 
     return NextResponse.json({ message: 'Database initialized successfully based on schema.sql.' });
   } catch (error) {

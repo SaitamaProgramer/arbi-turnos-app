@@ -1,151 +1,50 @@
 
-"use client";
-
-import { useEffect, useState } from "react";
-import ShiftTable from "@/components/admin/shift-table";
-import ClubMatchManager from "@/components/admin/form-config-editor"; 
-import AdminDashboard from "@/components/admin/admin-dashboard";
 import { 
-  getShiftRequests, 
-  getCurrentUserEmail, 
-  findUserByEmail, 
-  findClubById,
-  getRefereesByClubId,
-  getActiveClubId,
-  setActiveClubId,
-  getClubDefinedMatches, 
-  getMatchAssignments,  
-} from "@/lib/localStorage";
-import type { ShiftRequest, User, Club, ClubSpecificMatch, MatchAssignment } from "@/types"; 
+  getAdminPageData
+} from "@/lib/actions";
+import { getUserFromSession } from "@/lib/session";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ClipboardList, Settings, Loader2, ShieldAlert, Info, Copy, LayoutDashboard, CalendarPlus } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useToast } from "@/hooks/use-toast";
+import { redirect } from "next/navigation";
 import { Button } from "@/components/ui/button";
-
-export default function AdminPage() {
-  const [requests, setRequests] = useState<ShiftRequest[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [currentClub, setCurrentClub] = useState<Club | null>(null);
-  const [refereesInClub, setRefereesInClub] = useState<User[]>([]);
-  const [clubDefinedMatches, setClubDefinedMatches] = useState<ClubSpecificMatch[]>([]); 
-  const [matchAssignments, setMatchAssignments] = useState<MatchAssignment[]>([]); 
-
-  const router = useRouter();
-  const { toast } = useToast();
-
-  useEffect(() => {
-    const userEmail = getCurrentUserEmail();
-    if (!userEmail) {
-      router.push('/login');
-      return;
-    }
-    const user = findUserByEmail(userEmail);
-     setCurrentUser(user); 
-
-    if (user && user.role === 'admin' && user.administeredClubId) {
-      const adminClubId = user.administeredClubId;
-      if (getActiveClubId() !== adminClubId) {
-          setActiveClubId(adminClubId); 
-      }
-
-      const club = findClubById(adminClubId);
-      if (club) {
-        setCurrentClub(club);
-        setRequests(getShiftRequests(club.id)); 
-        setRefereesInClub(getRefereesByClubId(club.id));
-        const definedMatches = getClubDefinedMatches(club.id);
-        setClubDefinedMatches(definedMatches);
-        setMatchAssignments(getMatchAssignments().filter(a => a.clubId === club.id)); 
-      } else {
-         toast({ title: "Error de Club", description: "No se pudo encontrar el club que administras.", variant: "destructive" });
-         router.push('/login'); 
-         return;
-      }
-    } else if (user && user.role === 'referee') {
-       toast({
-        title: "Acceso Denegado",
-        description: "Esta página es solo para administradores.",
-        variant: "destructive"
-      });
-      router.push('/');
-      return;
-    }
-     else { 
-      toast({
-        title: "Acceso Denegado",
-        description: "No tienes permisos de administrador o no estás asociado a un club.",
-        variant: "destructive"
-      });
-      router.push('/login');
-      return;
-    }
-    setIsLoading(false);
-  }, [router, toast]);
+import ShiftTable from "@/components/admin/shift-table";
+import ClubMatchManager from "@/components/admin/form-config-editor";
+import AdminDashboard from "@/components/admin/admin-dashboard";
+import CopyClubIdButton from "@/components/admin/copy-club-id-button";
 
 
-  const copyClubId = () => {
-    if (currentClub?.id) {
-      navigator.clipboard.writeText(currentClub.id)
-        .then(() => {
-          toast({ title: "Código Copiado", description: "El código de tu club ha sido copiado al portapapeles." });
-        })
-        .catch(err => {
-          toast({ title: "Error al Copiar", description: "No se pudo copiar el código.", variant: "destructive" });
-        });
-    }
-  };
+export default async function AdminPage() {
+  const user = await getUserFromSession();
 
-  const refreshClubMatches = () => {
-    if (currentClub) {
-      setClubDefinedMatches(getClubDefinedMatches(currentClub.id));
-    }
-  };
-  
-  const refreshAssignments = () => {
-    if (currentClub) {
-      setMatchAssignments(getMatchAssignments().filter(a => a.clubId === currentClub.id));
-    }
-  };
+  if (!user) {
+    redirect('/login');
+  }
+  if (user.role !== 'admin' || !user.administeredClubId) {
+     redirect('/');
+  }
 
-  if (isLoading || !currentUser) { 
+  const adminClubId = user.administeredClubId;
+  const adminData = await getAdminPageData(adminClubId);
+
+  if (!adminData) {
     return (
-      <div className="flex justify-center items-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        <p className="ml-2">Cargando datos de administración...</p>
-      </div>
-    );
+     <div className="flex flex-col items-center justify-center h-64 text-center">
+       <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
+       <p className="text-xl font-semibold">Error al cargar el club.</p>
+       <p className="text-muted-foreground">No se pudo encontrar la información para el club que administras.</p>
+     </div>
+   );
   }
 
-  if (!currentClub && currentUser?.role === 'admin') { 
-     return (
-      <div className="flex flex-col items-center justify-center h-64 text-center">
-        <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
-        <p className="text-xl font-semibold">Error al cargar el club.</p>
-        <p className="text-muted-foreground">No se pudo encontrar el club que administras. Serás redirigido...</p>
-      </div>
-    );
-  }
-  
-  if (currentUser.role !== 'admin' || !currentClub) {
-     return (
-      <div className="flex flex-col items-center justify-center h-64 text-center">
-        <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
-        <p className="text-xl font-semibold">Acceso no autorizado o error.</p>
-        <p className="text-muted-foreground">Estás siendo redirigido...</p>
-      </div>
-    );
-  }
-
+  const { club, referees, shiftRequests, definedMatches, matchAssignments } = adminData;
 
   return (
     <div className="w-full space-y-6">
       <Card className="shadow-lg">
         <CardHeader>
           <CardTitle className="text-3xl font-headline flex items-center gap-2">
-            Panel de Admin: {currentClub.name}
+            Panel de Admin: {club.name}
           </CardTitle>
           <CardDescription>
             Gestiona las postulaciones, los turnos asignados y define los partidos/turnos disponibles para tu club.
@@ -169,23 +68,21 @@ export default function AdminPage() {
             </TabsList>
              <TabsContent value="dashboard" className="relative z-0">
               <AdminDashboard 
-                clubId={currentClub.id} 
-                allRefereesInClub={refereesInClub}
-                shiftRequestsForClub={requests} 
+                shiftRequestsForClub={shiftRequests}
+                allRefereesInClub={referees}
               />
             </TabsContent>
             <TabsContent value="assignments" className="relative z-0"> 
               <ShiftTable 
-                clubId={currentClub.id}
-                definedMatchesForClub={clubDefinedMatches}
-                allShiftRequestsForClub={requests} // To find who postulated for which match
-                allClubReferees={refereesInClub} // For displaying general referee info if needed
-                initialMatchAssignments={matchAssignments} // Pass current assignments
-                onAssignmentChanged={refreshAssignments} // Callback to refresh assignments on change
+                clubId={club.id}
+                initialDefinedMatches={definedMatches}
+                initialShiftRequests={shiftRequests}
+                initialClubReferees={referees}
+                initialMatchAssignments={matchAssignments}
               />
             </TabsContent>
             <TabsContent value="match-manager" className="relative z-0"> 
-              <ClubMatchManager clubId={currentClub.id} onMatchesUpdated={refreshClubMatches} />
+              <ClubMatchManager clubId={club.id} initialMatches={definedMatches} />
             </TabsContent>
             <TabsContent value="club-info" className="relative z-0">
               <Card>
@@ -194,13 +91,11 @@ export default function AdminPage() {
                   <CardDescription>Aquí puedes ver los detalles de tu club y compartir el código con tus árbitros.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <p><strong>Nombre del Club:</strong> {currentClub.name}</p>
+                  <p><strong>Nombre del Club:</strong> {club.name}</p>
                   <div className="flex items-center gap-2">
                     <strong>Código del Club:</strong> 
-                    <span className="font-mono bg-muted px-2 py-1 rounded text-sm">{currentClub.id}</span>
-                    <Button variant="outline" size="sm" onClick={copyClubId}>
-                      <Copy size={14} className="mr-1" /> Copiar Código
-                    </Button>
+                    <span className="font-mono bg-muted px-2 py-1 rounded text-sm">{club.id}</span>
+                    <CopyClubIdButton clubId={club.id} />
                   </div>
                   <p className="text-sm text-muted-foreground">
                     Comparte este código con los árbitros que deseen unirse a tu club.
@@ -215,4 +110,3 @@ export default function AdminPage() {
     </div>
   );
 }
-

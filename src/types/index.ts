@@ -1,6 +1,8 @@
 
+
 export interface ClubSpecificMatch {
   id: string;
+  clubId: string;
   description: string; 
   date: string; // ISO string for date, e.g., "2024-07-28"
   time: string; // e.g., "15:00"
@@ -9,17 +11,18 @@ export interface ClubSpecificMatch {
 
 export interface ShiftRequest {
   id: string;
-  userEmail: string;
+  userId: string;
   clubId: string; 
-  selectedMatches: ClubSpecificMatch[];
   hasCar: boolean;
   notes: string;
   status: 'pending' | 'completed'; 
   submittedAt: string; 
 }
 
-export const DAYS_OF_WEEK = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
-export const TIME_SLOTS = ["Mañana (08:00-12:00)", "Tarde (12:00-18:00)", "Noche (18:00-23:00)"];
+export interface ShiftRequestWithMatches extends ShiftRequest {
+  selectedMatches: ClubSpecificMatch[];
+}
+
 
 export interface Club {
   id: string; 
@@ -34,12 +37,34 @@ export interface User {
   role: 'admin' | 'referee';
   administeredClubId?: string; 
   memberClubIds?: string[]; 
-  password?: string; 
+  password?: string; // Should only be present when creating/checking, not on fetched user objects
 }
 
+export type RegisterUserPayload = Omit<User, 'id'> & {
+  confirmPassword?: string;
+  clubName?: string;
+  clubIdToJoin?: string;
+};
+
+
 export interface MatchAssignment {
+  id: number;
   clubId: string;
   matchId: string; 
-  assignedRefereeEmail: string;
+  assignedRefereeId: string;
   assignedAt: string;
+}
+
+// For client-side forms and data fetching structures
+export interface AvailabilityFormData {
+  activeClubId: string;
+  clubs: {
+    [clubId: string]: {
+      id: string;
+      name: string;
+      matches: ClubSpecificMatch[];
+      assignments: Omit<MatchAssignment, 'id' | 'clubId' | 'assignedAt'>[]; // Assignments for the current user in this club
+      postulation: ShiftRequestWithMatches | null; // Pending postulation for the current user in this club
+    }
+  }
 }

@@ -1,7 +1,7 @@
 
 "use client";
 
-import type { ShiftRequest, ClubSpecificMatch, User, MatchAssignment } from "@/types";
+import type { ShiftRequestWithMatches, ClubSpecificMatch, User, MatchAssignment } from "@/types";
 import {
   Table,
   TableBody,
@@ -28,27 +28,22 @@ import { useToast } from "@/hooks/use-toast";
 import { 
   assignRefereeToMatch,
   unassignRefereeFromMatch,
-  getRefereeNameByEmail,
-  getRefereesPostulatedForMatch,
-  getMatchAssignments,
-} from "@/lib/localStorage"; 
-import { UserCheck, UserPlus, Edit, Trash2, Users, CalendarCheck2, AlertTriangle } from "lucide-react";
-import { useState, useEffect, useCallback, useMemo } from "react";
+} from "@/lib/actions"; 
+import { UserCheck, UserPlus, Edit, Trash2, Users, CalendarCheck2, AlertTriangle, Loader2 } from "lucide-react";
+import { useState, useMemo, useTransition, useRouter } from "react";
 import { format, parseISO } from 'date-fns';
 
 interface ShiftTableProps {
   clubId: string; 
-  definedMatchesForClub: ClubSpecificMatch[];
-  allShiftRequestsForClub: ShiftRequest[]; // Still needed to find who postulated for what
-  allClubReferees: User[]; 
+  initialDefinedMatches: ClubSpecificMatch[];
+  initialShiftRequests: ShiftRequestWithMatches[];
+  initialClubReferees: User[]; 
   initialMatchAssignments: MatchAssignment[]; 
 }
 
 interface AssignDialogState {
   open: boolean;
   matchToAssign: ClubSpecificMatch | null;
-  postulatedRefereesForThisMatch: User[]; 
-  currentAssignedEmail?: string;
 }
 
 interface PostulatedRefereeDetails {
@@ -59,95 +54,105 @@ interface PostulatedRefereeDetails {
 
 export default function ShiftTable({ 
   clubId, 
-  definedMatchesForClub, 
-  allShiftRequestsForClub,
-  allClubReferees, // Not directly used in table rows, but useful for general listing if needed
+  initialDefinedMatches,
+  initialShiftRequests,
+  initialClubReferees,
   initialMatchAssignments
 }: ShiftTableProps) {
   const { toast } = useToast();
-  const [assignDialogState, setAssignDialogState] = useState<AssignDialogState>({ open: false, matchToAssign: null, postulatedRefereesForThisMatch: [] });
-  const [selectedRefereeForAssignment, setSelectedRefereeForAssignment] = useState<string>("");
-  const [currentAssignments, setCurrentAssignments] = useState<MatchAssignment[]>(initialMatchAssignments);
-  const [assignmentVersion, setAssignmentVersion] = useState(0);
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
 
-  useEffect(() => {
-    const clubAssignments = getMatchAssignments().filter(a => a.clubId === clubId);
-    setCurrentAssignments(clubAssignments);
-  }, [assignmentVersion, clubId, initialMatchAssignments]);
+  const [assignDialogState, setAssignDialogState] = useState<AssignDialogState>({ open: false, matchToAssign: null });
+  const [selectedRefereeId, setSelectedRefereeId] = useState<string>("");
+  
+  // These props will not update on their own after a server action. 
+  // We use the initial props to populate state that we can then manage on the client.
+  // The router.refresh() will cause the parent server component to re-render and pass new initial props.
+  const [definedMatches, setDefinedMatches] = useState(initialDefinedMatches);
+  const [shiftRequests, setShiftRequests] = useState(initialShiftRequests);
+  const [assignments, setAssignments] = useState(initialMatchAssignments);
+  
+  const getRefereeNameById = (userId: string) => initialClubReferees.find(u => u.id === userId)?.name || 'Desconocido';
 
-  const getPostulatedRefereesForSpecificMatchWithDetails = useCallback((matchId: string): PostulatedRefereeDetails[] => {
-    const detailsMap = new Map<string, PostulatedRefereeDetails>();
-
-    allShiftRequestsForClub.forEach(request => {
-      if (request.clubId === clubId && request.selectedMatches.some(sm => sm.id === matchId)) {
-        const user = allClubReferees.find(u => u.email === request.userEmail);
-        if (user && !detailsMap.has(user.email)) { // Add only once per user, using their latest postulation details
-          detailsMap.set(user.email, {
-            user,
-            hasCar: request.hasCar,
-            notes: request.notes,
-          });
+  const postulatedRefereesByMatchId = useMemo(() => {
+    const map = new Map<string, PostulatedRefereeDetails[]>();
+    for (const match of definedMatches) {
+        const postulated = [];
+        for (const request of shiftRequests) {
+            if (request.selectedMatches.some(sm => sm.id === match.id)) {
+                const user = initialClubReferees.find(u => u.id === request.userId);
+                if (user) {
+                    postulated.push({
+                        user,
+                        hasCar: request.hasCar,
+                        notes: request.notes,
+                    });
+                }
+            }
         }
-      }
-    });
-    return Array.from(detailsMap.values());
-  }, [allShiftRequestsForClub, allClubReferees, clubId]);
-
-  const getAssignmentForSpecificMatch = useCallback((matchId: string): MatchAssignment | undefined => {
-    return currentAssignments.find(a => a.matchId === matchId);
-  }, [currentAssignments]);
+        map.set(match.id, postulated);
+    }
+    return map;
+  }, [definedMatches, shiftRequests, initialClubReferees]);
 
   const openAssignDialog = (match: ClubSpecificMatch) => {
-    const postulatedUsers = getRefereesPostulatedForMatch(clubId, match.id); // Get users who postulated
-    const currentAssignment = getAssignmentForSpecificMatch(match.id);
-    
+    const currentAssignment = assignments.find(a => a.matchId === match.id);
+    setSelectedRefereeId(currentAssignment?.assignedRefereeId || "");
     setAssignDialogState({
       open: true,
       matchToAssign: match,
-      postulatedRefereesForThisMatch: postulatedUsers, 
-      currentAssignedEmail: currentAssignment?.assignedRefereeEmail,
     });
-    setSelectedRefereeForAssignment(currentAssignment?.assignedRefereeEmail || (postulatedUsers.length > 0 ? postulatedUsers[0].email : ""));
   };
 
   const handleAssignShift = () => {
-    if (!assignDialogState.matchToAssign || !selectedRefereeForAssignment) {
+    if (!assignDialogState.matchToAssign || !selectedRefereeId) {
       toast({ title: "Error de Selección", description: "Debes seleccionar un árbitro y un partido.", variant: "destructive" });
       return;
     }
 
-    const result = assignRefereeToMatch(clubId, assignDialogState.matchToAssign.id, selectedRefereeForAssignment);
-    
-    if (result.success && result.assignment) {
-      toast({
-        title: "Árbitro Asignado",
-        description: `${getRefereeNameByEmail(selectedRefereeForAssignment) || selectedRefereeForAssignment} ha sido asignado a ${assignDialogState.matchToAssign.description}.`,
-      });
-      setAssignmentVersion(v => v + 1);
-    } else {
-      toast({
-        title: "Error al Asignar",
-        description: result.message || "No se pudo asignar el árbitro. Puede que ya tenga un conflicto de horario.",
-        variant: "destructive",
-      });
-    }
-    
-    setAssignDialogState({ open: false, matchToAssign: null, postulatedRefereesForThisMatch: [] });
-    setSelectedRefereeForAssignment("");
+    startTransition(async () => {
+        const result = await assignRefereeToMatch(clubId, assignDialogState.matchToAssign!.id, selectedRefereeId);
+        
+        if (result.success) {
+          toast({
+            title: "Árbitro Asignado",
+            description: `${getRefereeNameById(selectedRefereeId) || selectedRefereeId} ha sido asignado.`,
+          });
+          router.refresh(); // Re-fetches server-side data and re-renders the component with new props
+        } else {
+          toast({
+            title: "Error al Asignar",
+            description: result.error || "No se pudo asignar el árbitro.",
+            variant: "destructive",
+          });
+        }
+        
+        setAssignDialogState({ open: false, matchToAssign: null });
+        setSelectedRefereeId("");
+    });
   };
   
   const handleUnassignShift = (matchId: string) => {
-    const match = definedMatchesForClub.find(m => m.id === matchId);
-    unassignRefereeFromMatch(clubId, matchId);
-    toast({
-      title: "Asignación Removida",
-      description: `El árbitro ha sido desasignado de ${match?.description || 'este partido'}.`,
-      variant: "default"
+    startTransition(async () => {
+        const result = await unassignRefereeFromMatch(clubId, matchId);
+        if (result.success) {
+            toast({
+              title: "Asignación Removida",
+              description: `El árbitro ha sido desasignado de este partido.`,
+            });
+            router.refresh();
+        } else {
+            toast({
+              title: "Error al Desasignar",
+              description: result.error || "Ocurrió un error inesperado.",
+              variant: "destructive"
+            });
+        }
     });
-    setAssignmentVersion(v => v + 1); 
   };
 
-  if (definedMatchesForClub.length === 0) {
+  if (definedMatches.length === 0) {
     return (
       <div className="text-center py-8 text-muted-foreground">
         <AlertTriangle className="mx-auto h-10 w-10 text-yellow-500 mb-3" />
@@ -161,7 +166,7 @@ export default function ShiftTable({
     <div className="rounded-lg border shadow-sm overflow-hidden bg-card">
       <Table>
         <TableCaption>
-          Gestionar asignaciones para cada partido/turno. Mostrando {definedMatchesForClub.length} partidos definidos.
+          Gestionar asignaciones para cada partido/turno. Mostrando {definedMatches.length} partidos definidos.
         </TableCaption>
         <TableHeader>
           <TableRow>
@@ -171,10 +176,10 @@ export default function ShiftTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {definedMatchesForClub.map((match) => {
-            const postulatedRefereeDetails = getPostulatedRefereesForSpecificMatchWithDetails(match.id);
-            const assignment = getAssignmentForSpecificMatch(match.id);
-            const assignedRefereeName = assignment ? (getRefereeNameByEmail(assignment.assignedRefereeEmail) || assignment.assignedRefereeEmail) : null;
+          {definedMatches.map((match) => {
+            const postulatedRefereeDetails = postulatedRefereesByMatchId.get(match.id) || [];
+            const assignment = assignments.find(a => a.matchId === match.id);
+            const assignedRefereeName = assignment ? getRefereeNameById(assignment.assignedRefereeId) : null;
 
             return (
               <TableRow key={match.id}>
@@ -212,10 +217,10 @@ export default function ShiftTable({
                         <UserCheck className="mr-1 h-3 w-3" /> Asignado: {assignedRefereeName}
                       </Badge>
                       <div className="flex gap-1">
-                        <Button variant="outline" size="sm" onClick={() => openAssignDialog(match)} className="h-7 px-2 py-1 text-xs whitespace-nowrap">
+                        <Button variant="outline" size="sm" onClick={() => openAssignDialog(match)} className="h-7 px-2 py-1 text-xs whitespace-nowrap" disabled={isPending}>
                           <Edit size={12} className="mr-1"/> Reasignar
                         </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleUnassignShift(match.id)} className="h-7 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 whitespace-nowrap">
+                        <Button variant="ghost" size="sm" onClick={() => handleUnassignShift(match.id)} className="h-7 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 whitespace-nowrap" disabled={isPending}>
                           <Trash2 size={12} className="mr-1"/> Quitar
                         </Button>
                       </div>
@@ -226,7 +231,7 @@ export default function ShiftTable({
                       size="sm" 
                       onClick={() => openAssignDialog(match)} 
                       className="h-7 px-2 py-1 text-xs whitespace-nowrap"
-                      disabled={postulatedRefereeDetails.length === 0} 
+                      disabled={postulatedRefereeDetails.length === 0 || isPending} 
                     >
                       <UserPlus className="mr-1 h-3 w-3" /> Asignar Árbitro
                     </Button>
@@ -244,8 +249,8 @@ export default function ShiftTable({
       {assignDialogState.open && assignDialogState.matchToAssign && (
         <AlertDialog open={assignDialogState.open} onOpenChange={(open) => {
             if (!open) {
-                setAssignDialogState({ open: false, matchToAssign: null, postulatedRefereesForThisMatch: [] });
-                setSelectedRefereeForAssignment("");
+                setAssignDialogState({ open: false, matchToAssign: null });
+                setSelectedRefereeId("");
             }
         }}>
           <AlertDialogContent>
@@ -257,35 +262,24 @@ export default function ShiftTable({
                 </p>
               </AlertDialogTitle>
               <AlertDialogDescription>
-                {assignDialogState.currentAssignedEmail && 
-                  `Actualmente asignado a: ${getRefereeNameByEmail(assignDialogState.currentAssignedEmail) || assignDialogState.currentAssignedEmail}. `}
-                {assignDialogState.postulatedRefereesForThisMatch.length > 0 
-                  ? "Selecciona un árbitro de la lista de postulantes para este partido/turno." 
-                  : "No hay árbitros postulados directamente para este partido. Solo puedes asignar árbitros que se hayan postulado."}
+                Selecciona un árbitro de la lista de postulantes para este partido/turno.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <div className="py-4">
               <Select 
-                onValueChange={setSelectedRefereeForAssignment} 
-                value={selectedRefereeForAssignment}
-                disabled={assignDialogState.postulatedRefereesForThisMatch.length === 0}
+                onValueChange={setSelectedRefereeId} 
+                value={selectedRefereeId}
+                disabled={ (postulatedRefereesByMatchId.get(assignDialogState.matchToAssign.id) || []).length === 0}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder={
-                      assignDialogState.postulatedRefereesForThisMatch.length > 0 
-                        ? "Selecciona un árbitro postulado" 
-                        : "No hay postulantes directos"
-                    } />
+                  <SelectValue placeholder="Selecciona un árbitro postulado" />
                 </SelectTrigger>
                 <SelectContent>
-                  {assignDialogState.postulatedRefereesForThisMatch.map(referee => (
-                    <SelectItem key={referee.id} value={referee.email}>
-                      {referee.name} ({referee.email})
+                  {(postulatedRefereesByMatchId.get(assignDialogState.matchToAssign.id) || []).map(detail => (
+                    <SelectItem key={detail.user.id} value={detail.user.id}>
+                      {detail.user.name} ({detail.user.email})
                     </SelectItem>
                   ))}
-                  {assignDialogState.postulatedRefereesForThisMatch.length === 0 && (
-                     <SelectItem value="no-postulantes" disabled>No hay árbitros postulados para este partido</SelectItem>
-                  )}
                 </SelectContent>
               </Select>
             </div>
@@ -294,7 +288,8 @@ export default function ShiftTable({
               <AlertDialogAction 
                 onClick={handleAssignShift} 
                 className="bg-primary hover:bg-primary/90" 
-                disabled={!selectedRefereeForAssignment || selectedRefereeForAssignment === "no-postulantes" || assignDialogState.postulatedRefereesForThisMatch.length === 0}>
+                disabled={!selectedRefereeId || isPending}>
+                {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
                 Confirmar Asignación
               </AlertDialogAction>
             </AlertDialogFooter>
@@ -304,4 +299,3 @@ export default function ShiftTable({
     </div>
   );
 }
-

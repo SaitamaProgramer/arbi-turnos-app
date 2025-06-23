@@ -2,7 +2,7 @@
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
-import { useForm, useFieldArray, Controller } from "react-hook-form";
+import { useForm, useFieldArray } from "react-hook-form";
 import * as z from "zod";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,12 +19,13 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
-import { getClubDefinedMatches, saveClubDefinedMatches } from "@/lib/localStorage";
+import { saveClubDefinedMatches } from "@/lib/actions";
 import type { ClubSpecificMatch } from "@/types";
-import { useEffect, useState } from "react";
+import { useState, useTransition } from "react";
 import { Save, ListPlus, Trash2, Loader2, CalendarPlusIcon, CalendarIcon, ClockIcon, MapPinIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO } from "date-fns";
+import { useRouter } from "next/navigation";
 
 const matchSchema = z.object({
   id: z.string(),
@@ -42,17 +43,21 @@ type ClubMatchesFormValues = z.infer<typeof clubMatchesFormSchema>;
 
 interface ClubMatchManagerProps {
   clubId: string;
-  onMatchesUpdated?: () => void;
+  initialMatches: ClubSpecificMatch[];
 }
 
-export default function ClubMatchManager({ clubId, onMatchesUpdated }: ClubMatchManagerProps) {
+export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchManagerProps) {
   const { toast } = useToast();
-  const [isLoading, setIsLoading] = useState(true);
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
   
   const form = useForm<ClubMatchesFormValues>({
     resolver: zodResolver(clubMatchesFormSchema),
     defaultValues: {
-      matches: [],
+      matches: initialMatches.map(m => ({
+        ...m,
+        date: parseISO(m.date),
+      })) || [],
     },
   });
 
@@ -61,42 +66,32 @@ export default function ClubMatchManager({ clubId, onMatchesUpdated }: ClubMatch
     name: "matches",
   });
 
-  useEffect(() => {
-    if (clubId) {
-      setIsLoading(true);
-      const currentMatches = getClubDefinedMatches(clubId);
-      form.reset({
-        matches: currentMatches.map(m => ({ 
-          id: m.id, 
-          description: m.description,
-          date: m.date ? parseISO(m.date) : new Date(), // Parse ISO string to Date object
-          time: m.time,
-          location: m.location,
-        })),
-      });
-      setIsLoading(false);
-    }
-  }, [form, clubId]);
-
   function onSubmit(data: ClubMatchesFormValues) {
-    if (!clubId) {
-      toast({ title: "Error", description: "No se pudo identificar el club.", variant: "destructive" });
-      return;
-    }
-    const newMatchesToSave: ClubSpecificMatch[] = data.matches.map(m => ({
-        id: m.id || crypto.randomUUID(), 
-        description: m.description,
-        date: format(m.date, 'yyyy-MM-dd'), // Format Date object to ISO string
-        time: m.time,
-        location: m.location,
-    }));
+    startTransition(async () => {
+        const newMatchesToSave: Omit<ClubSpecificMatch, 'clubId'>[] = data.matches.map(m => ({
+            id: m.id,
+            description: m.description,
+            date: format(m.date, 'yyyy-MM-dd'),
+            time: m.time,
+            location: m.location,
+        }));
 
-    saveClubDefinedMatches(clubId, newMatchesToSave);
-    toast({
-      title: "Partidos Guardados",
-      description: "La lista de partidos/turnos disponibles para tu club ha sido actualizada.",
+        const result = await saveClubDefinedMatches(clubId, newMatchesToSave);
+
+        if (result.success) {
+            toast({
+              title: "Partidos Guardados",
+              description: "La lista de partidos/turnos disponibles para tu club ha sido actualizada.",
+            });
+            router.refresh();
+        } else {
+             toast({
+              title: "Error al Guardar",
+              description: result.error || "Ocurrió un error inesperado.",
+              variant: "destructive"
+            });
+        }
     });
-    onMatchesUpdated?.();
   }
 
   const addNewMatchField = () => {
@@ -109,14 +104,6 @@ export default function ClubMatchManager({ clubId, onMatchesUpdated }: ClubMatch
     });
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-        Cargando partidos del club...
-      </div>
-    );
-  }
 
   return (
     <Card className="shadow-lg">
@@ -229,7 +216,7 @@ export default function ClubMatchManager({ clubId, onMatchesUpdated }: ClubMatch
                 </div>
               </Card>
             ))}
-             {fields.length === 0 && !isLoading && (
+             {fields.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">
                     No hay partidos definidos para este club. Añade el primero.
                 </p>
@@ -245,9 +232,9 @@ export default function ClubMatchManager({ clubId, onMatchesUpdated }: ClubMatch
                   <ListPlus className="mr-2 h-4 w-4" />
                   Añadir Nuevo Partido/Turno
                 </Button>
-                <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground">
-                  <Save className="mr-2 h-4 w-4" />
-                  Guardar Cambios en Partidos
+                <Button type="submit" className="w-full sm:w-auto bg-accent hover:bg-accent/90 text-accent-foreground" disabled={isPending}>
+                  {isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                  {isPending ? 'Guardando...' : 'Guardar Cambios en Partidos'}
                 </Button>
             </div>
             <FormDescription>
