@@ -8,12 +8,16 @@ import type { User } from '@/types';
 import { db } from './db';
 
 const secretKey = process.env.SESSION_SECRET;
-const key = new TextEncoder().encode(secretKey);
+
+function getKey() {
+    if (!secretKey) {
+        throw new Error('SESSION_SECRET environment variable is not set');
+    }
+    return new TextEncoder().encode(secretKey);
+}
 
 export async function encrypt(payload: any) {
-  if (!secretKey) {
-    throw new Error('SESSION_SECRET environment variable is not set');
-  }
+  const key = getKey();
   return await new SignJWT(payload)
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
@@ -22,9 +26,7 @@ export async function encrypt(payload: any) {
 }
 
 export async function decrypt(input: string): Promise<any> {
-  if (!secretKey) {
-    throw new Error('SESSION_SECRET environment variable is not set');
-  }
+  const key = getKey();
   try {
     const { payload } = await jwtVerify(input, key, {
       algorithms: ['HS256'],
