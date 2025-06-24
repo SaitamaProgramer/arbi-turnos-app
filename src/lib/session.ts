@@ -7,9 +7,8 @@ import { redirect } from 'next/navigation';
 import type { User } from '@/types';
 import { db } from './db';
 
-const secretKey = process.env.SESSION_SECRET;
-
 function getKey() {
+    const secretKey = process.env.SESSION_SECRET;
     if (!secretKey) {
         throw new Error('SESSION_SECRET environment variable is not set');
     }
