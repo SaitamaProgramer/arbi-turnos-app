@@ -38,7 +38,8 @@ export async function decrypt(input: string): Promise<any> {
 }
 
 export async function createSession(userId?: string) {
-  const sessionCookie = cookies().get('session')?.value;
+  const cookieStore = cookies();
+  const sessionCookie = cookieStore.get('session')?.value;
   if (!userId && sessionCookie) {
       const existingSession = await decrypt(sessionCookie);
       if(existingSession?.userId) userId = existingSession.userId;
@@ -53,12 +54,13 @@ export async function createSession(userId?: string) {
   const session = await encrypt({ userId, expires });
 
   // Save the session in a cookie
-  cookies().set('session', session, { expires, httpOnly: true });
+  cookieStore.set('session', session, { expires, httpOnly: true });
   return { userId };
 }
 
 export async function deleteSession() {
-  cookies().set('session', '', { expires: new Date(0) });
+  const cookieStore = cookies();
+  cookieStore.set('session', '', { expires: new Date(0) });
 }
 
 function rowsToType<T>(rows: any[]): T[] {
@@ -73,7 +75,8 @@ function rowsToType<T>(rows: any[]): T[] {
 }
 
 export async function getUserFromSession(): Promise<User | null> {
-    const session = cookies().get('session')?.value;
+    const cookieStore = cookies();
+    const session = cookieStore.get('session')?.value;
     if (!session) return null;
 
     const payload = await decrypt(session);
