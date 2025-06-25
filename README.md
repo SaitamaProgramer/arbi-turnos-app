@@ -87,11 +87,12 @@ Esta sección contiene detalles técnicos sobre el proyecto, su estructura y có
     ```
 
 2.  **Configurar variables de entorno:**
-    - Crea un archivo `.env` en la raíz y añade las claves `SESSION_SECRET` y `PASSWORD_SECRET`. Puedes usar el archivo `.env.example` como guía.
+    - Crea un archivo `.env` en la raíz y añade las claves `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `SESSION_SECRET` y `PASSWORD_SECRET`. Para desarrollo local, puedes usar `TURSO_DATABASE_URL="file:arbitros.db"`.
 
 3.  **Inicializar la base de datos local (solo la primera vez):**
-    - Necesitarás la [CLI de Turso](https://docs.turso.tech/reference/turso-cli#installation).
-    - Ejecuta el siguiente comando para crear el archivo `arbitros.db` con las tablas necesarias:
+    - Abre el archivo `schema.sql` y copia su contenido.
+    - Puedes usar una extensión de VSCode como "SQLite" o cualquier otro cliente de bases de datos para abrir el archivo `arbitros.db` y pegar/ejecutar el SQL.
+    - Alternativamente, si tienes la [CLI de Turso](https://docs.turso.tech/reference/turso-cli#installation), puedes ejecutar:
     ```bash
     turso dev --db-file arbitros.db < schema.sql
     ```
@@ -102,9 +103,9 @@ Esta sección contiene detalles técnicos sobre el proyecto, su estructura y có
     ```
     La aplicación estará disponible en `http://localhost:9002`.
 
-### Despliegue y Base de Datos de Producción
+### Inicializar la Base de Datos de Producción (Método Recomendado)
 
-Para inicializar tu base de datos de producción en Turso por primera vez y crear todas las tablas necesarias, puedes usar la interfaz web de Turso, que es la forma más sencilla.
+Para inicializar tu base de datos de producción en Turso por primera vez y crear todas las tablas, el método más sencillo y fiable es usar la interfaz web de Turso.
 
 1. **Inicia Sesión en Turso:**
    - Ve a [https://app.turso.tech/](https://app.turso.tech/) y accede a tu cuenta.
