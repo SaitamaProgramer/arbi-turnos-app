@@ -104,9 +104,24 @@ Esta sección contiene detalles técnicos sobre el proyecto, su estructura y có
 
 ### Despliegue y Base de Datos de Producción
 
-Para inicializar tu base de datos de producción en Turso por primera vez, ejecuta el siguiente comando después de haberla creado:
+Para inicializar tu base de datos de producción en Turso por primera vez y crear todas las tablas necesarias, puedes usar la interfaz web de Turso, que es la forma más sencilla.
 
-```bash
-turso db shell TU_NOMBRE_DE_BASE_DE_DATOS < schema.sql
-```
-Asegúrate de reemplazar `TU_NOMBRE_DE_BASE_DE_DATOS` con el nombre real de tu base de datos en Turso. Puedes ver tus bases de datos con `turso db list`.
+1. **Inicia Sesión en Turso:**
+   - Ve a [https://app.turso.tech/](https://app.turso.tech/) y accede a tu cuenta.
+
+2. **Selecciona tu Base de Datos:**
+   - En el dashboard, haz clic sobre el nombre de la base de datos que estás usando para este proyecto.
+
+3. **Abre la Consola (Shell):**
+   - Busca y haz clic en la pestaña que dice **"Shell"**. Esto abrirá una consola donde puedes ejecutar comandos SQL directamente.
+
+4. **Copia el Contenido de `schema.sql`:**
+   - Abre el archivo `schema.sql` que se encuentra en la raíz de este proyecto.
+   - Selecciona y copia **todo** el texto que contiene.
+
+5. **Pega y Ejecuta el Script:**
+   - Vuelve a la consola de Turso.
+   - Pega el contenido completo que copiaste en el área de texto de la consola.
+   - Haz clic en el botón **"Run"** o **"Execute"**.
+
+Después de unos segundos, las tablas se habrán creado en tu base de datos de producción. ¡Y eso es todo! Tu aplicación desplegada en Vercel ahora estará completamente funcional.
