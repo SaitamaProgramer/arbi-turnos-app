@@ -16,11 +16,14 @@ export async function GET() {
     // Split schema into individual, trimmed statements and filter out any empty ones
     const statements = schema.split(';').map(s => s.trim()).filter(s => s.length > 0);
     
-    // Use db.batch() in 'write' mode, which is the recommended and most robust way 
-    // to execute DDL (schema-altering) statements on Turso.
-    await db.batch(statements, 'write');
+    // Execute each statement individually, without a transaction wrapper.
+    // This is the most robust method for DDL on some distributed systems like Turso
+    // when running from a serverless environment.
+    for (const statement of statements) {
+        await db.execute(statement);
+    }
 
-    return NextResponse.json({ message: 'Database initialized successfully using batch execution.' });
+    return NextResponse.json({ message: 'Database initialized successfully statement by statement.' });
   } catch (error) {
     console.error('Database initialization failed:', error);
     const errorMessage = error instanceof Error ? error.message : 'An unknown error occurred';
