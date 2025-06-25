@@ -13,9 +13,13 @@ export async function GET() {
     
     const schema = fs.readFileSync(schemaPath, 'utf-8');
     
-    // For @libsql/client, we need to split statements and run them in a batch.
+    // Split schema into individual statements
     const statements = schema.split(';').filter(s => s.trim().length > 0);
-    await db.batch(statements);
+    
+    // Execute each statement sequentially instead of in a batch for better compatibility with Turso
+    for (const statement of statements) {
+        await db.execute(statement);
+    }
 
     return NextResponse.json({ message: 'Database initialized successfully based on schema.sql.' });
   } catch (error) {
