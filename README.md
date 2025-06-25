@@ -1,4 +1,3 @@
-
 # ArbiTurnos
 
 Aplicación para la gestión de turnos de árbitros. Construida con Next.js en Firebase Studio.
@@ -65,3 +64,79 @@ Al iniciar sesión, serás redirigido a tu panel de administración. Se divide e
 
 #### Pestaña: Dashboard
 - Obtén un resumen rápido del estado de tu club: total de árbitros, cuántos han enviado postulaciones y quiénes faltan por hacerlo.
+
+---
+
+## Información para Desarrolladores
+
+Esta sección contiene detalles técnicos sobre el proyecto, su estructura y cómo ejecutarlo.
+
+### Tech Stack
+
+La aplicación está construida con un stack moderno, enfocado en rendimiento y experiencia de desarrollo:
+
+- **Framework:** [Next.js](https://nextjs.org/) (usando el App Router)
+- **Lenguaje:** [TypeScript](https://www.typescriptlang.org/)
+- **UI Framework:** [React](https://reactjs.org/)
+- **Componentes UI:** [ShadCN UI](https://ui.shadcn.com/)
+- **Estilos:** [Tailwind CSS](https://tailwindcss.com/)
+- **Base de Datos:** [Turso](https://turso.tech/) (con [libSQL](https://libsql.org/)) para producción, con fallback a un archivo SQLite local para desarrollo.
+- **ORM/Cliente DB:** `@libsql/client`
+- **Autenticación:** Sesiones JWT manejadas con `jose` y cookies `httpOnly`.
+- **Validaciones:** [Zod](https://zod.dev/) para la validación de esquemas y formularios.
+- **Despliegue:** Preparado para [Vercel](https://vercel.com/).
+
+### Estructura del Proyecto
+
+El código fuente se encuentra en el directorio `src/`.
+
+- `src/app/`: Contiene las rutas de la aplicación (App Router de Next.js). Cada carpeta es un segmento de la URL.
+  - `(pages)`: Grupos de rutas para las páginas principales como login, registro, admin, etc.
+  - `api/`: Contiene los endpoints de la API, como el script para inicializar la base de datos.
+  - `layout.tsx`: El layout principal de la aplicación.
+  - `globals.css`: Estilos globales y configuración de temas de ShadCN/Tailwind.
+- `src/components/`: Componentes reutilizables de React.
+  - `ui/`: Componentes base de ShadCN UI.
+  - `admin/`: Componentes específicos del panel de administración.
+  - `user/`: Componentes específicos de la vista de árbitro.
+  - `layout/`: Componentes de la estructura de la página (Navbar, etc.).
+- `src/lib/`: Lógica principal del backend y utilidades.
+  - `actions.ts`: Server Actions de Next.js para interactuar con la base de datos (crear usuarios, guardar turnos, etc.).
+  - `db.ts`: Configuración del cliente de la base de datos (Turso/libSQL).
+  - `session.ts`: Lógica para la gestión de sesiones de usuario (crear, verificar y eliminar sesión).
+  - `utils.ts`: Funciones de utilidad reutilizables.
+- `src/types/`: Definiciones de tipos de TypeScript para los modelos de datos (User, Club, etc.).
+- `src/hooks/`: Hooks personalizados de React.
+- `schema.sql`: El esquema SQL que define la estructura de la base de datos.
+- `.env`: Archivo de variables de entorno para desarrollo local (no incluido en Git).
+
+### Cómo Ejecutar Localmente
+
+1. **Instalar dependencias:**
+   ```bash
+   npm install
+   ```
+
+2. **Configurar variables de entorno:**
+   - Renombra el archivo `.env.example` a `.env` (si existe) o crea un nuevo archivo `.env` en la raíz del proyecto.
+   - Añade las siguientes claves. Puedes usar los valores de ejemplo que ya están en el archivo o generar los tuyos propios:
+     ```
+     # Claves para la encriptación de sesión y contraseñas. ¡Deben ser secretas!
+     SESSION_SECRET="tu_secreto_para_sesiones_aqui_largo_y_seguro"
+     PASSWORD_SECRET="tu_secreto_para_passwords_aqui_largo_y_seguro"
+
+     # No son necesarias para el desarrollo local, la app usará un archivo .db
+     TURSO_DATABASE_URL="file:arbitros.db"
+     TURSO_AUTH_TOKEN=""
+     ```
+
+3. **Ejecutar el servidor de desarrollo:**
+   ```bash
+   npm run dev
+   ```
+
+4. **Inicializar la base de datos local (solo la primera vez):**
+   - Una vez que la aplicación esté corriendo, abre tu navegador y visita: `http://localhost:9002/api/db/init`
+   - Esto creará el archivo `arbitros.db` con todas las tablas necesarias.
+
+¡Ahora la aplicación debería estar funcionando en `http://localhost:9002`!
