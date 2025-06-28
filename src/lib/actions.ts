@@ -181,7 +181,7 @@ export async function getAdminPageData(clubId: string) {
                         sr.id, sr.user_id, sr.club_id, sr.has_car, sr.notes, sr.status, sr.submitted_at,
                         srm.match_id
                     FROM shift_requests sr
-                    JOIN shift_request_matches srm ON sr.id = srm.request_id
+                    LEFT JOIN shift_request_matches srm ON sr.id = srm.request_id
                     WHERE sr.club_id = ?
                 `,
                 args: [clubId]
@@ -191,7 +191,7 @@ export async function getAdminPageData(clubId: string) {
                 args: [clubId]
             }),
             db.execute({
-                sql: 'SELECT match_id, assigned_referee_id FROM match_assignments WHERE club_id = ?',
+                sql: 'SELECT id, club_id, match_id, assigned_referee_id, assigned_at FROM match_assignments WHERE club_id = ?',
                 args: [clubId]
             })
         ]);
@@ -202,19 +202,29 @@ export async function getAdminPageData(clubId: string) {
         const referees = rowsToType<User>(refereesResult.rows);
         const shiftRequestsRaw = shiftRequestsRawResult.rows;
         const definedMatches = rowsToType<ClubSpecificMatch>(definedMatchesResult.rows);
-        const matchAssignments = rowsToType<Omit<MatchAssignment, 'clubId' | 'assignedAt' | 'id'>>(matchAssignmentsResult.rows);
+        const matchAssignments = rowsToType<MatchAssignment>(matchAssignmentsResult.rows);
 
         // Process shift requests to group matches by request ID
         const requestsMap = new Map<string, ShiftRequestWithMatches>();
         for (const row of shiftRequestsRaw) {
-            const match = definedMatches.find(m => m.id === row.match_id);
-            if (!match) continue;
-
-            const typedRow = rowsToType<any>([row])[0];
+             const typedRow = rowsToType<any>([row])[0];
+            
+            if (!typedRow.id) continue;
 
             if (requestsMap.has(typedRow.id as string)) {
-                requestsMap.get(typedRow.id as string)!.selectedMatches.push(match);
+                if (typedRow.matchId) {
+                    const match = definedMatches.find(m => m.id === typedRow.matchId);
+                    if (match) {
+                        requestsMap.get(typedRow.id as string)!.selectedMatches.push(match);
+                    }
+                }
             } else {
+                const selectedMatches = [];
+                if (typedRow.matchId) {
+                    const match = definedMatches.find(m => m.id === typedRow.matchId);
+                    if (match) selectedMatches.push(match);
+                }
+
                 requestsMap.set(typedRow.id as string, {
                     id: typedRow.id as string,
                     userId: typedRow.userId as string,
@@ -223,7 +233,7 @@ export async function getAdminPageData(clubId: string) {
                     notes: typedRow.notes as string,
                     status: typedRow.status as 'pending' | 'completed',
                     submittedAt: typedRow.submittedAt as string,
-                    selectedMatches: [match],
+                    selectedMatches,
                 });
             }
         }
@@ -328,7 +338,7 @@ export async function getAvailabilityFormData(userId: string) {
             ]);
 
             const matches = rowsToType<ClubSpecificMatch>(matchesResult.rows);
-            const assignments = rowsToType<MatchAssignment>(assignmentsResult.rows);
+            const assignments = rowsToType<Omit<MatchAssignment, 'id'| 'clubId' | 'assignedAt'>>(assignmentsResult.rows);
             const postulationRow = rowsToType<ShiftRequest>(postulationResult.rows)[0];
             
             let postulationWithMatches: ShiftRequestWithMatches | null = null;
@@ -373,9 +383,11 @@ export async function getAvailabilityFormData(userId: string) {
 
 
 const availabilitySchema = z.object({
-  selectedMatchIds: z.array(z.string()).min(1),
-  hasCar: z.string().transform(s => s === 'true'),
-  notes: z.string().optional(),
+  selectedMatchIds: z.array(z.string()).refine((value) => value.length > 0, {
+    message: "Debes seleccionar al menos un partido/turno.",
+  }),
+  hasCar: z.boolean(),
+  notes: z.string().max(500, "Las notas no pueden exceder los 500 caracteres.").optional(),
   selectedClubId: z.string(),
 });
 
@@ -408,7 +420,7 @@ export async function submitAvailability(payload: z.infer<typeof availabilitySch
         try {
             await tx.execute({
                 sql: 'INSERT INTO shift_requests (id, user_id, club_id, has_car, notes, status, submitted_at) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                args: [requestId, userId, selectedClubId, hasCar ? 1 : 0, notes, 'pending', submittedAt]
+                args: [requestId, userId, selectedClubId, hasCar ? 1 : 0, notes ?? null, 'pending', submittedAt]
             });
             for (const matchId of selectedMatchIds) {
                 await tx.execute({
@@ -457,7 +469,7 @@ export async function updateAvailability(requestId: string, payload: z.infer<typ
             sql: 'SELECT match_id FROM shift_request_matches WHERE request_id = ?',
             args: [requestId]
         });
-        const matchIdsInRequest = matchesInRequestResult.rows.map(r => r.id as string);
+        const matchIdsInRequest = matchesInRequestResult.rows.map(r => r.match_id as string);
 
         if (matchIdsInRequest.length > 0) {
             const matchesInRequestDataResult = await db.execute({
@@ -470,7 +482,7 @@ export async function updateAvailability(requestId: string, payload: z.infer<typ
                 sql: 'SELECT match_id, assigned_referee_id FROM match_assignments WHERE club_id = ? AND assigned_referee_id = ?',
                 args: [selectedClubId, userId]
             });
-            const assignmentsForUser = rowsToType<MatchAssignment>(assignmentsForUserResult.rows);
+            const assignmentsForUser = rowsToType<Omit<MatchAssignment, 'id'| 'clubId' | 'assignedAt'>>(assignmentsForUserResult.rows);
             
             if (!isPostulationEditable(matchesInRequest, assignmentsForUser)) {
                 return { error: 'La postulación no es editable porque uno o más partidos están muy próximos o ya han sido asignados.' };
@@ -481,7 +493,7 @@ export async function updateAvailability(requestId: string, payload: z.infer<typ
         try {
             await tx.execute({
                 sql: 'UPDATE shift_requests SET has_car = ?, notes = ?, submitted_at = ? WHERE id = ?',
-                args: [hasCar ? 1 : 0, notes, new Date().toISOString(), requestId]
+                args: [hasCar ? 1 : 0, notes ?? null, new Date().toISOString(), requestId]
             });
             await tx.execute({
                 sql: 'DELETE FROM shift_request_matches WHERE request_id = ?',

@@ -42,7 +42,7 @@ async function decrypt(input: string): Promise<{ userId: string } | null> {
 
 // Create a new session with the user's ID
 export async function createSession(userId: string) {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   const expires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 1 day
   const session = await encrypt({ userId, expires });
 
@@ -50,13 +50,13 @@ export async function createSession(userId: string) {
 }
 
 export async function deleteSession() {
-  const cookieStore = cookies();
+  const cookieStore = await cookies();
   cookieStore.set('session', '', { expires: new Date(0) });
 }
 
 // Get the user from the current session cookie by re-fetching from DB
 export async function getUserFromSession(): Promise<User | null> {
-    const sessionCookie = cookies().get('session')?.value;
+    const sessionCookie = (await cookies()).get('session')?.value;
     if (!sessionCookie) return null;
 
     const decryptedPayload = await decrypt(sessionCookie);

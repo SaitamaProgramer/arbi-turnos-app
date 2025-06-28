@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -65,11 +66,16 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
 
   async function onSubmit(data: AvailabilityFormValues) {
     startTransition(async () => {
+      const payload = {
+        ...data,
+        hasCar: data.hasCar === 'true',
+      };
+
       let result;
       if (isEditing && postulation) {
-        result = await updateAvailability(postulation.id, data);
+        result = await updateAvailability(postulation.id, payload);
       } else {
-        result = await submitAvailability(data);
+        result = await submitAvailability(payload);
       }
 
       if (result?.error) {

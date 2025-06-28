@@ -1,4 +1,3 @@
-
 "use client";
 
 import type { ShiftRequestWithMatches, ClubSpecificMatch, User, MatchAssignment } from "@/types";
@@ -30,7 +29,7 @@ import {
   unassignRefereeFromMatch,
 } from "@/lib/actions"; 
 import { UserCheck, UserPlus, Edit, Trash2, Users, CalendarCheck2, AlertTriangle, Loader2 } from "lucide-react";
-import { useState, useMemo, useTransition } from "react";
+import { useState, useMemo, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from 'date-fns';
 import { es } from "date-fns/locale";
@@ -68,12 +67,17 @@ export default function ShiftTable({
   const [assignDialogState, setAssignDialogState] = useState<AssignDialogState>({ open: false, matchToAssign: null });
   const [selectedRefereeId, setSelectedRefereeId] = useState<string>("");
   
-  // These props will not update on their own after a server action. 
-  // We use the initial props to populate state that we can then manage on the client.
-  // The router.refresh() will cause the parent server component to re-render and pass new props.
   const [definedMatches, setDefinedMatches] = useState(initialDefinedMatches);
   const [shiftRequests, setShiftRequests] = useState(initialShiftRequests);
   const [assignments, setAssignments] = useState(initialMatchAssignments);
+  
+  // Sincroniza el estado del componente con las props actualizadas después de un router.refresh().
+  // Esto es crucial para que la UI se actualice después de una acción del servidor.
+  useEffect(() => {
+    setDefinedMatches(initialDefinedMatches);
+    setShiftRequests(initialShiftRequests);
+    setAssignments(initialMatchAssignments);
+  }, [initialDefinedMatches, initialShiftRequests, initialMatchAssignments]);
   
   const getRefereeNameById = (userId: string) => initialClubReferees.find(u => u.id === userId)?.name || 'Desconocido';
 
@@ -121,7 +125,7 @@ export default function ShiftTable({
             title: "Árbitro Asignado",
             description: `${getRefereeNameById(selectedRefereeId) || selectedRefereeId} ha sido asignado.`,
           });
-          router.refresh(); // Re-fetches server-side data and re-renders the component with new props
+          router.refresh(); 
         } else {
           toast({
             title: "Error al Asignar",
