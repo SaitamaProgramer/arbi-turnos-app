@@ -30,6 +30,7 @@ import { ListChecks, Car, ClipboardList, Send, Loader2, AlertTriangle, Users, Ed
 import { useEffect, useState, useTransition, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from 'date-fns';
+import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 
@@ -184,7 +185,7 @@ export default function AvailabilityForm({ initialData, user }: AvailabilityForm
                                         <div>
                                             <p className="font-medium">{match.description}</p>
                                             <p className="text-sm text-muted-foreground">
-                                                {format(parseISO(match.date), "EEEE, dd 'de' MMMM 'de' yyyy")} a las {match.time} hs.
+                                                {format(parseISO(match.date), "EEEE, dd 'de' MMMM 'de' yyyy", { locale: es })} a las {match.time} hs.
                                             </p>
                                             <p className="text-sm text-muted-foreground">Lugar: {match.location}</p>
                                         </div>
@@ -357,7 +358,7 @@ export default function AvailabilityForm({ initialData, user }: AvailabilityForm
                                       {isThisMatchAssignedToCurrentUser && <Badge variant="default" className="ml-2 bg-green-500 text-white text-[10px] px-1.5 py-0.5">Asignado a ti</Badge>}
                                     </FormLabel>
                                     <p className={cn("text-xs text-muted-foreground", (disableCheckbox && !isChecked) && "text-muted-foreground/50")}>
-                                        {format(parseISO(match.date), "dd/MM/yy")} - {match.time} hs. en {match.location}
+                                        {format(parseISO(match.date), "dd/MM/yy", { locale: es })} - {match.time} hs. en {match.location}
                                         {!isThisMatchActuallyEditableByDate && !isThisMatchAssignedToCurrentUser && <span className="text-red-500 text-xs italic ml-1">(Plazo vencido)</span>}
                                     </p>
                                   </div>
@@ -438,5 +439,3 @@ export default function AvailabilityForm({ initialData, user }: AvailabilityForm
     </Card>
   );
 }
-
-    

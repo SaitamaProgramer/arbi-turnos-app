@@ -33,6 +33,7 @@ import { UserCheck, UserPlus, Edit, Trash2, Users, CalendarCheck2, AlertTriangle
 import { useState, useMemo, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { format, parseISO } from 'date-fns';
+import { es } from "date-fns/locale";
 
 interface ShiftTableProps {
   clubId: string; 
@@ -187,7 +188,7 @@ export default function ShiftTable({
                 <TableCell className="font-medium align-top pt-3">
                   <p className="font-semibold">{match.description}</p>
                   <p className="text-xs text-muted-foreground">
-                    {format(parseISO(match.date), "dd/MM/yyyy")} a las {match.time} hs.
+                    {format(parseISO(match.date), "dd/MM/yyyy", { locale: es })} a las {match.time} hs.
                   </p>
                   <p className="text-xs text-muted-foreground">Lugar: {match.location}</p>
                 </TableCell>
@@ -259,7 +260,7 @@ export default function ShiftTable({
               <AlertDialogTitle>
                 Asignar Árbitro para: <span className="font-semibold">{assignDialogState.matchToAssign.description}</span>
                 <p className="text-sm text-muted-foreground font-normal">
-                    {format(parseISO(assignDialogState.matchToAssign.date), "dd/MM/yyyy")} a las {assignDialogState.matchToAssign.time} hs. en {assignDialogState.matchToAssign.location}
+                    {format(parseISO(assignDialogState.matchToAssign.date), "dd/MM/yyyy", { locale: es })} a las {assignDialogState.matchToAssign.time} hs. en {assignDialogState.matchToAssign.location}
                 </p>
               </AlertDialogTitle>
               <AlertDialogDescription>

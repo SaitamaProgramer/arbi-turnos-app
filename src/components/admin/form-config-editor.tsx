@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -25,6 +24,7 @@ import { useState, useTransition } from "react";
 import { Save, ListPlus, Trash2, Loader2, CalendarPlusIcon, CalendarIcon, ClockIcon, MapPinIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO, formatISO } from "date-fns";
+import { es } from "date-fns/locale";
 import { useRouter } from "next/navigation";
 
 const matchSchema = z.object({
@@ -165,7 +165,7 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
                                 )}
                                 >
                                 {inputField.value ? (
-                                    format(inputField.value, "PPP") //PPP for more readable date like "Jul 22, 2024"
+                                    format(inputField.value, "PPP", { locale: es }) //PPP for more readable date like "Jul 22, 2024"
                                 ) : (
                                     <span>Selecciona una fecha</span>
                                 )}
@@ -180,6 +180,7 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
                                 onSelect={inputField.onChange}
                                 disabled={(date) => date < new Date(new Date().setHours(0,0,0,0)) } // Disable past dates
                                 initialFocus
+                                locale={es}
                             />
                             </PopoverContent>
                         </Popover>
@@ -246,5 +247,3 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
     </Card>
   );
 }
-
-    
