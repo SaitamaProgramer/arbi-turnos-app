@@ -20,7 +20,11 @@ import { useToast } from "@/hooks/use-toast";
 import { LogIn, Eye, EyeOff } from "lucide-react";
 import { login } from "@/lib/actions";
 import { useTransition, useState } from "react";
+import type { Metadata } from 'next';
 
+// Note: generateMetadata can't be used in client components.
+// We can set a static title here or handle it differently if needed.
+// For simplicity, we'll let the layout handle the title.
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),

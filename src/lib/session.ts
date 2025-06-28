@@ -5,6 +5,7 @@ import { SignJWT, jwtVerify } from 'jose';
 import { cookies } from 'next/headers';
 import type { User } from '@/types';
 import { db } from './db';
+import { rowsToType } from './utils';
 
 function getKey() {
     const secretKey = process.env.SESSION_SECRET;
@@ -73,17 +74,6 @@ export async function getUserFromSession(): Promise<User | null> {
     }
 }
 
-// Helper to cast rows to a specific type, needed by getFullUserFromDb
-function rowsToType<T>(rows: any[]): T[] {
-    return rows.map(row => {
-        const newRow: { [key: string]: any } = {};
-        for (const key in row) {
-            const camelCaseKey = key.replace(/_([a-z])/g, g => g[1].toUpperCase());
-            newRow[camelCaseKey] = row[key];
-        }
-        return newRow as T;
-    });
-}
 
 // Utility to fetch the full user object from DB (now used by session management)
 export async function getFullUserFromDb(userId: string): Promise<User | null> {
@@ -118,5 +108,3 @@ export async function getFullUserFromDb(userId: string): Promise<User | null> {
         return null;
     }
 }
-
-    

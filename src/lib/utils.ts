@@ -1,4 +1,3 @@
-
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { parseISO, isBefore, startOfDay } from 'date-fns';
@@ -8,6 +7,19 @@ import type { ClubSpecificMatch, MatchAssignment } from "./types";
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
+
+// Centralized utility to convert snake_case DB rows to camelCase objects
+export function rowsToType<T>(rows: any[]): T[] {
+    return rows.map(row => {
+        const newRow: { [key: string]: any } = {};
+        for (const key in row) {
+            const camelCaseKey = key.replace(/_([a-z])/g, g => g[1].toUpperCase());
+            newRow[camelCaseKey] = row[key];
+        }
+        return newRow as T;
+    });
+}
+
 
 export const isMatchEditable = (matchDateStr: string): boolean => {
   try {
@@ -53,5 +65,6 @@ export const isPostulationEditable = (
   
   return true; // All checks passed
 };
+
 
     

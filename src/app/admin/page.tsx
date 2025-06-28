@@ -5,13 +5,18 @@ import {
 import { getUserFromSession } from "@/lib/session";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClipboardList, Settings, Loader2, ShieldAlert, Info, Copy, LayoutDashboard, CalendarPlus } from "lucide-react";
+import { ClipboardList, ShieldAlert, Info, LayoutDashboard, CalendarPlus } from "lucide-react";
 import { redirect } from "next/navigation";
-import { Button } from "@/components/ui/button";
 import ShiftTable from "@/components/admin/shift-table";
 import ClubMatchManager from "@/components/admin/form-config-editor";
 import AdminDashboard from "@/components/admin/admin-dashboard";
 import CopyClubIdButton from "@/components/admin/copy-club-id-button";
+import type { Metadata } from 'next';
+
+export const metadata: Metadata = {
+  title: 'Panel de Administración',
+  description: 'Gestiona tu asociación, define partidos y asigna árbitros.',
+};
 
 
 export default async function AdminPage() {
