@@ -14,9 +14,10 @@ declare global {
 let url = process.env.TURSO_DATABASE_URL;
 const authToken = process.env.TURSO_AUTH_TOKEN;
 
+let isLocalDb = false;
 // Developer-friendly fallback to a local file database if Turso URL is not set or is a placeholder
 if (!url || url.includes('your-db-name')) {
-  console.log('TURSO_DATABASE_URL not set or is a placeholder, falling back to local file: arbitros.db');
+  isLocalDb = true;
   url = 'file:arbitros.db';
 }
 
@@ -33,4 +34,8 @@ export const db =
 
 if (process.env.NODE_ENV !== 'production') global.db = db;
 
-console.log(`Database client configured for: ${url.startsWith('file:') ? 'Local SQLite File' : 'Turso'}`);
+if (isLocalDb) {
+  console.log('✅ Base de datos local conectada: arbitros.db. Si cambias las claves secretas (.env), borra este archivo para reiniciar.');
+} else {
+  console.log('✅ Conectado a la base de datos de Turso.');
+}

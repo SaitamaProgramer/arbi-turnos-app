@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import Navbar from '@/components/layout/navbar';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
+import Footer from '@/components/layout/footer';
 
 // General metadata for the app
 export const metadata: Metadata = {
@@ -41,6 +42,7 @@ export default function RootLayout({
         <main className="flex-grow container mx-auto px-4 py-8">
           {children}
         </main>
+        <Footer />
         <Toaster />
         <Analytics />
         <SpeedInsights />

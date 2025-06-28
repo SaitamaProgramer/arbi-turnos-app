@@ -3,8 +3,8 @@
 import 'server-only';
 
 import { db } from './db';
-import type { Club, ClubSpecificMatch, MatchAssignment, RegisterUserPayload, ShiftRequest, ShiftRequestWithMatches, User } from '@/types';
-import { createSession, deleteSession, getUserFromSession } from './session';
+import type { Club, ClubSpecificMatch, MatchAssignment, RegisterUserPayload, ShiftRequest, ShiftRequestWithMatches, Suggestion, User } from '@/types';
+import { getUserFromSession, createSession, deleteSession } from './session';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { isPostulationEditable, rowsToType } from './utils';
@@ -163,7 +163,7 @@ export async function getAdminPageData(clubId: string) {
             refereesResult,
             shiftRequestsRawResult,
             definedMatchesResult,
-            matchAssignmentsResult
+            matchAssignmentsResult,
         ] = await Promise.all([
             db.execute({ sql: 'SELECT * FROM clubs WHERE id = ?', args: [clubId] }),
             db.execute({
@@ -193,7 +193,7 @@ export async function getAdminPageData(clubId: string) {
             db.execute({
                 sql: 'SELECT id, club_id, match_id, assigned_referee_id, assigned_at FROM match_assignments WHERE club_id = ?',
                 args: [clubId]
-            })
+            }),
         ]);
 
         const club = rowsToType<Club>(clubResult.rows)[0];
@@ -244,7 +244,7 @@ export async function getAdminPageData(clubId: string) {
             referees,
             shiftRequests,
             definedMatches,
-            matchAssignments
+            matchAssignments,
         };
 
     } catch (e: any) {
@@ -252,6 +252,25 @@ export async function getAdminPageData(clubId: string) {
         return null;
     }
 }
+
+export async function getSuggestions(): Promise<Suggestion[]> {
+    const user = await getUserFromSession();
+    // Extra security: only fetch if the user is truly the developer.
+    if (!user?.isDeveloper) {
+        return [];
+    }
+    try {
+        const suggestionsResult = await db.execute({ 
+            sql: 'SELECT id, user_id, user_name, suggestion_text, submitted_at FROM suggestions ORDER BY submitted_at DESC',
+            args: [] 
+        });
+        return rowsToType<Suggestion>(suggestionsResult.rows);
+    } catch (error) {
+        console.error("Error fetching suggestions:", error);
+        return [];
+    }
+}
+
 
 export async function saveClubDefinedMatches(clubId: string, matches: Omit<ClubSpecificMatch, 'clubId'>[]) {
     const user = await getUserFromSession();
@@ -587,3 +606,34 @@ export async function unassignRefereeFromMatch(clubId: string, matchId: string) 
         return { error: 'No se pudo quitar la asignación.' };
     }
 }
+
+
+const suggestionSchema = z.string().min(10, { message: "La sugerencia debe tener al menos 10 caracteres."}).max(1000, { message: "La sugerencia no puede exceder los 1000 caracteres."});
+
+export async function submitSuggestion(suggestionText: string) {
+    const validation = suggestionSchema.safeParse(suggestionText);
+    if (!validation.success) {
+        return { success: false, error: validation.error.errors[0].message };
+    }
+
+    try {
+        const user = await getUserFromSession();
+        
+        const newSuggestionId = `sug_${randomBytes(16).toString('hex')}`;
+        const submittedAt = new Date().toISOString();
+        const userId = user?.id ?? null;
+        const userName = user?.name ?? 'Anónimo';
+
+        await db.execute({
+            sql: 'INSERT INTO suggestions (id, user_id, user_name, suggestion_text, submitted_at) VALUES (?, ?, ?, ?, ?)',
+            args: [newSuggestionId, userId, userName, validation.data, submittedAt]
+        });
+        
+        return { success: true };
+    } catch(e: any) {
+        console.error("submitSuggestion error:", e);
+        return { success: false, error: "Ocurrió un error al enviar tu sugerencia." };
+    }
+}
+
+    

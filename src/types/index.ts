@@ -37,6 +37,7 @@ export interface User {
   administeredClubId?: string; 
   memberClubIds?: string[]; 
   password?: string; // Should only be present when creating/checking, not on fetched user objects
+  isDeveloper?: boolean; // Flag to identify the developer user
 }
 
 export type RegisterUserPayload = Omit<User, 'id'> & {
@@ -68,4 +69,11 @@ export interface AvailabilityFormData {
   }
 }
 
+export interface Suggestion {
+  id: string;
+  userId?: string;
+  userName?: string;
+  suggestionText: string;
+  submittedAt: string;
+}
     

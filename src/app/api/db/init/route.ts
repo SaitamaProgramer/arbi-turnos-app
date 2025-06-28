@@ -61,6 +61,14 @@ const schemaCreationCommands = [
     FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
     FOREIGN KEY (match_id) REFERENCES club_matches(id) ON DELETE CASCADE,
     FOREIGN KEY (assigned_referee_id) REFERENCES users(id) ON DELETE CASCADE
+  );`,
+   `CREATE TABLE IF NOT EXISTS suggestions (
+      id TEXT PRIMARY KEY,
+      user_id TEXT,
+      user_name TEXT,
+      suggestion_text TEXT NOT NULL,
+      submitted_at TEXT NOT NULL,
+      FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
   );`
 ];
 
