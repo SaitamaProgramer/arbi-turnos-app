@@ -157,7 +157,7 @@ export default function ShiftTable({
     return (
       <div className="text-center py-8 text-muted-foreground">
         <AlertTriangle className="mx-auto h-10 w-10 text-yellow-500 mb-3" />
-        <p className="font-semibold">No hay partidos definidos para este club.</p>
+        <p className="font-semibold">No hay partidos definidos para esta asociación.</p>
         <p className="text-sm">Por favor, ve a la pestaña "Definir Partidos/Turnos" para añadir algunos.</p>
       </div>
     );
@@ -300,3 +300,5 @@ export default function ShiftTable({
     </div>
   );
 }
+
+    

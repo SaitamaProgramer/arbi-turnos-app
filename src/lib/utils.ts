@@ -9,10 +9,11 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const isMatchEditable = (matchDate: string): boolean => {
+export const isMatchEditable = (matchDateStr: string): boolean => {
   try {
+    // Dates from the database might not have a time component, so parseISO is robust
     const today = startOfDay(new Date());
-    const mDate = startOfDay(parseISO(matchDate)); 
+    const mDate = startOfDay(parseISO(matchDateStr)); 
     
     // Check if the match date is in the past
     if (isBefore(mDate, today)) return false; 
@@ -24,7 +25,7 @@ export const isMatchEditable = (matchDate: string): boolean => {
     // i.e., 3 days away or more is editable. 2, 1, 0 days away is not.
     return diffInDays > 2; 
   } catch (e) {
-    console.error("Error parsing match date for editability check:", matchDate, e);
+    console.error("Error parsing match date for editability check:", matchDateStr, e);
     return false; // Safely default to not editable on error
   }
 };
@@ -52,3 +53,5 @@ export const isPostulationEditable = (
   
   return true; // All checks passed
 };
+
+    

@@ -29,7 +29,7 @@ export function HelpDialog() {
             Cómo Usar ArbiTurnos
           </DialogTitle>
           <DialogDescription>
-            Guía rápida para administradores de clubes y árbitros.
+            Guía rápida para administradores de asociaciones y árbitros.
           </DialogDescription>
         </DialogHeader>
         <Tabs defaultValue="referee" className="w-full">
@@ -40,17 +40,17 @@ export function HelpDialog() {
           <TabsContent value="referee" className="mt-4 max-h-[60vh] overflow-y-auto pr-4">
             <div className="space-y-4 text-sm">
                 <h3 className="font-semibold text-lg">1. Registro</h3>
-                <p>Para empezar, necesitas una invitación de un club. Pídele al administrador del club el <strong>"Código de Club"</strong>.</p>
+                <p>Para empezar, necesitas una invitación de una asociación. Pídele al administrador de la asociación el <strong>"Código de Asociación"</strong>.</p>
                 <ul className="list-disc pl-5 space-y-1">
                     <li>En la página de registro, selecciona la opción <strong>"Árbitro"</strong>.</li>
-                    <li>Ingresa el "Código de Club" que te proporcionaron.</li>
+                    <li>Ingresa el "Código de Asociación" que te proporcionaron.</li>
                     <li>Completa tu nombre, email y crea una contraseña segura.</li>
                 </ul>
 
                 <h3 className="font-semibold text-lg">2. Postularte a Turnos</h3>
                 <p>Una vez que inicies sesión, irás a la página de "Disponibilidad".</p>
                 <ul className="list-disc pl-5 space-y-1">
-                    <li>Si perteneces a varios clubes, usa el menú desplegable para seleccionar el club correcto.</li>
+                    <li>Si perteneces a varias asociaciones, usa el menú desplegable para seleccionar la asociación correcta.</li>
                     <li>Verás una lista de todos los partidos o turnos disponibles definidos por el administrador.</li>
                     <li>Marca las casillas de todos los partidos para los que deseas postularte.</li>
                     <li>Indica si dispones de auto (esto ayuda al administrador con la logística).</li>
@@ -68,21 +68,21 @@ export function HelpDialog() {
           </TabsContent>
           <TabsContent value="admin" className="mt-4 max-h-[60vh] overflow-y-auto pr-4">
              <div className="space-y-4 text-sm">
-                <h3 className="font-semibold text-lg">1. Registro de tu Club</h3>
-                <p>Como administrador, tú creas el club desde cero.</p>
+                <h3 className="font-semibold text-lg">1. Registro de tu Asociación</h3>
+                <p>Como administrador, tú creas la asociación desde cero.</p>
                 <ul className="list-disc pl-5 space-y-1">
-                    <li>En la página de registro, selecciona la opción <strong>"Administrador de Club"</strong>.</li>
-                    <li>Ingresa el nombre que tendrá tu club o liga.</li>
+                    <li>En la página de registro, selecciona la opción <strong>"Administrador de Asociación"</strong>.</li>
+                    <li>Ingresa el nombre que tendrá tu asociación o liga.</li>
                     <li>Completa tu nombre, email y crea una contraseña segura.</li>
                 </ul>
 
-                <h3 className="font-semibold text-lg">2. Gestionar tu Club (Panel de Admin)</h3>
+                <h3 className="font-semibold text-lg">2. Gestionar tu Asociación (Panel de Admin)</h3>
                 <p>Al iniciar sesión, serás redirigido a tu panel de administración.</p>
                 
-                <h4 className="font-medium text-md pl-2">Pestaña: Info del Club</h4>
+                <h4 className="font-medium text-md pl-2">Pestaña: Info de la Asociación</h4>
                 <ul className="list-disc pl-5 space-y-1">
-                    <li>Aquí encontrarás el <strong>"Código del Club"</strong>. Este código es único y secreto.</li>
-                    <li>Cópialo y compártelo con los árbitros que quieras que se unan a tu club. Ellos lo necesitarán para registrarse.</li>
+                    <li>Aquí encontrarás el <strong>"Código de la Asociación"</strong>. Este código es único y secreto.</li>
+                    <li>Cópialo y compártelo con los árbitros que quieras que se unan a tu asociación. Ellos lo necesitarán para registrarse.</li>
                 </ul>
                 
                 <h4 className="font-medium text-md pl-2">Pestaña: Definir Partidos/Turnos</h4>
@@ -103,7 +103,7 @@ export function HelpDialog() {
 
                 <h4 className="font-medium text-md pl-2">Pestaña: Dashboard</h4>
                 <ul className="list-disc pl-5 space-y-1">
-                    <li>Obtén un resumen rápido del estado de tu club: total de árbitros, cuántos han enviado postulaciones y quiénes faltan por hacerlo.</li>
+                    <li>Obtén un resumen rápido del estado de tu asociación: total de árbitros, cuántos han enviado postulaciones y quiénes faltan por hacerlo.</li>
                 </ul>
             </div>
           </TabsContent>

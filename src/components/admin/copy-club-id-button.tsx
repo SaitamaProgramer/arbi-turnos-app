@@ -12,7 +12,7 @@ export default function CopyClubIdButton({ clubId }: { clubId: string }) {
         if (clubId) {
             navigator.clipboard.writeText(clubId)
                 .then(() => {
-                    toast({ title: "Código Copiado", description: "El código de tu club ha sido copiado al portapapeles." });
+                    toast({ title: "Código Copiado", description: "El código de tu asociación ha sido copiado al portapapeles." });
                 })
                 .catch(err => {
                     toast({ title: "Error al Copiar", description: "No se pudo copiar el código.", variant: "destructive" });

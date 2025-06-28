@@ -24,7 +24,7 @@ import type { ClubSpecificMatch } from "@/types";
 import { useState, useTransition } from "react";
 import { Save, ListPlus, Trash2, Loader2, CalendarPlusIcon, CalendarIcon, ClockIcon, MapPinIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { format, parseISO } from "date-fns";
+import { format, parseISO, formatISO } from "date-fns";
 import { useRouter } from "next/navigation";
 
 const matchSchema = z.object({
@@ -71,7 +71,7 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
         const newMatchesToSave: Omit<ClubSpecificMatch, 'clubId'>[] = data.matches.map(m => ({
             id: m.id,
             description: m.description,
-            date: format(m.date, 'yyyy-MM-dd'),
+            date: formatISO(m.date, { representation: 'date' }), // "2024-07-30"
             time: m.time,
             location: m.location,
         }));
@@ -81,7 +81,7 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
         if (result.success) {
             toast({
               title: "Partidos Guardados",
-              description: "La lista de partidos/turnos disponibles para tu club ha sido actualizada.",
+              description: "La lista de partidos/turnos disponibles para tu asociación ha sido actualizada.",
             });
             router.refresh();
         } else {
@@ -110,10 +110,10 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
       <CardHeader>
         <CardTitle className="text-2xl font-headline flex items-center gap-2">
           <CalendarPlusIcon size={28} className="text-primary" />
-          Definir Partidos/Turnos del Club
+          Definir Partidos/Turnos de la Asociación
         </CardTitle>
         <CardDescription>
-          Crea, edita o elimina los partidos o bloques de turno específicos para tu club.
+          Crea, edita o elimina los partidos o bloques de turno específicos para tu asociación.
           Incluye descripción, fecha, hora y lugar.
         </CardDescription>
       </CardHeader>
@@ -218,7 +218,7 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
             ))}
              {fields.length === 0 && (
                 <p className="text-sm text-muted-foreground text-center py-4">
-                    No hay partidos definidos para este club. Añade el primero.
+                    No hay partidos definidos para esta asociación. Añade el primero.
                 </p>
             )}
 
@@ -246,3 +246,5 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
     </Card>
   );
 }
+
+    

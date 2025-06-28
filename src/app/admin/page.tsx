@@ -31,8 +31,8 @@ export default async function AdminPage() {
     return (
      <div className="flex flex-col items-center justify-center h-64 text-center">
        <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
-       <p className="text-xl font-semibold">Error al cargar el club.</p>
-       <p className="text-muted-foreground">No se pudo encontrar la información para el club que administras.</p>
+       <p className="text-xl font-semibold">Error al cargar la asociación.</p>
+       <p className="text-muted-foreground">No se pudo encontrar la información para la asociación que administras.</p>
      </div>
    );
   }
@@ -47,7 +47,7 @@ export default async function AdminPage() {
             Panel de Admin: {club.name}
           </CardTitle>
           <CardDescription>
-            Gestiona las postulaciones, los turnos asignados y define los partidos/turnos disponibles para tu club.
+            Gestiona las postulaciones, los turnos asignados y define los partidos/turnos disponibles para tu asociación.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -63,7 +63,7 @@ export default async function AdminPage() {
                 <CalendarPlus className="mr-2 h-4 w-4" /> Definir Partidos/Turnos
               </TabsTrigger>
                <TabsTrigger value="club-info">
-                <Info className="mr-2 h-4 w-4" /> Info del Club
+                <Info className="mr-2 h-4 w-4" /> Info de la Asociación
               </TabsTrigger>
             </TabsList>
              <TabsContent value="dashboard" className="relative z-0">
@@ -87,18 +87,18 @@ export default async function AdminPage() {
             <TabsContent value="club-info" className="relative z-0">
               <Card>
                 <CardHeader>
-                  <CardTitle>Información de tu Club</CardTitle>
-                  <CardDescription>Aquí puedes ver los detalles de tu club y compartir el código con tus árbitros.</CardDescription>
+                  <CardTitle>Información de tu Asociación</CardTitle>
+                  <CardDescription>Aquí puedes ver los detalles de tu asociación y compartir el código con tus árbitros.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <p><strong>Nombre del Club:</strong> {club.name}</p>
+                  <p><strong>Nombre de la Asociación:</strong> {club.name}</p>
                   <div className="flex items-center gap-2">
-                    <strong>Código del Club:</strong> 
+                    <strong>Código de la Asociación:</strong> 
                     <span className="font-mono bg-muted px-2 py-1 rounded text-sm">{club.id}</span>
                     <CopyClubIdButton clubId={club.id} />
                   </div>
                   <p className="text-sm text-muted-foreground">
-                    Comparte este código con los árbitros que deseen unirse a tu club.
+                    Comparte este código con los árbitros que deseen unirse a tu asociación.
                     Deberán ingresarlo durante el proceso de registro.
                   </p>
                 </CardContent>

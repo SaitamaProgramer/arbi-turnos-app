@@ -4,25 +4,47 @@ Aplicación para la gestión de turnos de árbitros. Construida con Next.js en F
 
 ## ¿Cómo Funciona?
 
-ArbiTurnos conecta a administradores de clubes/ligas con árbitros, simplificando el proceso de postulación y asignación de turnos para partidos.
+ArbiTurnos conecta a administradores de asociaciones/ligas con árbitros, simplificando el proceso de postulación y asignación de turnos para partidos.
+
+---
+## Guía Rápida para Empezar
+
+### 1. Inicializar la Base de Datos (Paso Único)
+
+Ya sea que estés trabajando localmente o hayas desplegado en Vercel, necesitas crear las tablas en tu base de datos por primera vez.
+
+- **Si estás en local:** Ejecuta la aplicación (`npm run dev`) y visita la siguiente URL en tu navegador:
+  [http://localhost:9002/api/db/init](http://localhost:9002/api/db/init)
+
+- **Si ya desplegaste en Vercel:** Visita la misma ruta, pero con tu dominio de producción:
+  `https://[tu-dominio-de-vercel]/api/db/init`
+
+Deberías ver un mensaje de éxito. **Solo necesitas hacer esto una vez.**
+
+### 2. Registrarse y Usar la App
+
+Una vez que la base de datos está lista, ¡ya puedes usar la aplicación!
+
+- Ve a la página principal y regístrate como **Administrador de Asociación** o como **Árbitro**.
+- ¡Explora las funcionalidades!
 
 ---
 
 ## Guía para Árbitros
 
-Como árbitro, tu rol es unirte a un club y postularte a los turnos que el administrador haya creado.
+Como árbitro, tu rol es unirte a una asociación y postularte a los turnos que el administrador haya creado.
 
-### 1. Registrarse en un Club
-Para empezar, necesitas una invitación. Pídele al administrador del club el **"Código de Club"**.
+### 1. Registrarse en una Asociación
+Para empezar, necesitas una invitación. Pídele al administrador de la asociación el **"Código de Asociación"**.
 
 - En la página de registro, selecciona la opción **"Árbitro"**.
-- Ingresa el "Código de Club" que te proporcionaron.
+- Ingresa el "Código de Asociación" que te proporcionaron.
 - Completa tu nombre, email y crea una contraseña segura.
 
 ### 2. Postularte a Turnos
 Una vez que inicies sesión, irás a la página de **"Disponibilidad"**.
 
-- Si perteneces a varios clubes, usa el menú desplegable para seleccionar el club correcto.
+- Si perteneces a varias asociaciones, usa el menú desplegable para seleccionar la asociación correcta.
 - Verás una lista de todos los partidos o turnos disponibles.
 - Marca las casillas de todos los partidos para los que deseas postularte.
 - Indica si dispones de auto y añade notas opcionales.
@@ -35,21 +57,21 @@ Una vez que inicies sesión, irás a la página de **"Disponibilidad"**.
 
 ---
 
-## Guía para Administradores de Club
+## Guía para Administradores de Asociación
 
-Como administrador, tu rol es crear y gestionar tu club, definir los turnos y asignar árbitros.
+Como administrador, tu rol es crear y gestionar tu asociación, definir los turnos y asignar árbitros.
 
-### 1. Registrar tu Club
-- En la página de registro, selecciona la opción **"Administrador de Club"**.
-- Ingresa el nombre que tendrá tu club o liga.
-- Completa tu nombre, email y crea una contraseña segura. Tu club se creará automáticamente.
+### 1. Registrar tu Asociación
+- En la página de registro, selecciona la opción **"Administrador de Asociación"**.
+- Ingresa el nombre que tendrá tu asociación o liga.
+- Completa tu nombre, email y crea una contraseña segura. Tu asociación se creará automáticamente.
 
-### 2. Gestionar tu Club (Panel de Admin)
+### 2. Gestionar tu Asociación (Panel de Admin)
 Al iniciar sesión, serás redirigido a tu panel de administración. Se divide en varias pestañas:
 
-#### Pestaña: Info del Club
-- Aquí encontrarás el **"Código del Club"**. Este código es único.
-- Cópialo y compártelo con los árbitros que quieras que se unan a tu club. Ellos lo necesitarán para registrarse.
+#### Pestaña: Info de la Asociación
+- Aquí encontrarás el **"Código de la Asociación"**. Este código es único.
+- Cópialo y compártelo con los árbitros que quieras que se unan a tu asociación. Ellos lo necesitarán para registrarse.
 
 #### Pestaña: Definir Partidos/Turnos
 - Aquí es donde creas los "turnos" a los que los árbitros se postularán.
@@ -63,7 +85,7 @@ Al iniciar sesión, serás redirigido a tu panel de administración. Se divide e
 - Una vez asignado, puedes reasignar o quitar la asignación si es necesario.
 
 #### Pestaña: Dashboard
-- Obtén un resumen rápido del estado de tu club: total de árbitros, cuántos han enviado postulaciones y quiénes faltan por hacerlo.
+- Obtén un resumen rápido del estado de tu asociación: total de árbitros, cuántos han enviado postulaciones y quiénes faltan por hacerlo.
 
 ---
 
@@ -89,40 +111,13 @@ Esta sección contiene detalles técnicos sobre el proyecto, su estructura y có
 2.  **Configurar variables de entorno:**
     - Crea un archivo `.env` en la raíz y añade las claves `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN`, `SESSION_SECRET` y `PASSWORD_SECRET`. Para desarrollo local, puedes usar `TURSO_DATABASE_URL="file:arbitros.db"`.
 
-3.  **Inicializar la base de datos local (solo la primera vez):**
-    - Abre el archivo `schema.sql` y copia su contenido.
-    - Puedes usar una extensión de VSCode como "SQLite" o cualquier otro cliente de bases de datos para abrir el archivo `arbitros.db` y pegar/ejecutar el SQL.
-    - Alternativamente, si tienes la [CLI de Turso](https://docs.turso.tech/reference/turso-cli#installation), puedes ejecutar:
-    ```bash
-    turso dev --db-file arbitros.db < schema.sql
-    ```
-
-4.  **Ejecutar el servidor de desarrollo:**
+3.  **Ejecutar el servidor de desarrollo:**
     ```bash
     npm run dev
     ```
     La aplicación estará disponible en `http://localhost:9002`.
 
-### Inicializar la Base de Datos de Producción (Método Recomendado)
-
-Para inicializar tu base de datos de producción en Turso por primera vez y crear todas las tablas, el método más sencillo y fiable es usar la interfaz web de Turso.
-
-1. **Inicia Sesión en Turso:**
-   - Ve a [https://app.turso.tech/](https://app.turso.tech/) y accede a tu cuenta.
-
-2. **Selecciona tu Base de Datos:**
-   - En el dashboard, haz clic sobre el nombre de la base de datos que estás usando para este proyecto.
-
-3. **Abre la Consola (Shell):**
-   - Busca y haz clic en la pestaña que dice **"Shell"**. Esto abrirá una consola donde puedes ejecutar comandos SQL directamente.
-
-4. **Copia el Contenido de `schema.sql`:**
-   - Abre el archivo `schema.sql` que se encuentra en la raíz de este proyecto.
-   - Selecciona y copia **todo** el texto que contiene.
-
-5. **Pega y Ejecuta el Script:**
-   - Vuelve a la consola de Turso.
-   - Pega el contenido completo que copiaste en el área de texto de la consola.
-   - Haz clic en el botón **"Run"** o **"Execute"**.
-
-Después de unos segundos, las tablas se habrán creado en tu base de datos de producción. ¡Y eso es todo! Tu aplicación desplegada en Vercel ahora estará completamente funcional.
+4.  **Inicializar la base de datos local (solo la primera vez):**
+    - Con la aplicación corriendo, abre tu navegador y visita:
+    [http://localhost:9002/api/db/init](http://localhost:9002/api/db/init)
+    - Esto creará todas las tablas necesarias en tu archivo `arbitros.db`.

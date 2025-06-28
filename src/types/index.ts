@@ -3,7 +3,7 @@ export interface ClubSpecificMatch {
   id: string;
   clubId: string;
   description: string; 
-  date: string; // ISO string for date, e.g., "2024-07-28"
+  date: string; // ISO string for date, e.g., "2024-07-28T00:00:00.000Z" or just "2024-07-28"
   time: string; // e.g., "15:00"
   location: string;
 }
@@ -67,3 +67,5 @@ export interface AvailabilityFormData {
     }
   }
 }
+
+    

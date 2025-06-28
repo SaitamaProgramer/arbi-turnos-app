@@ -19,7 +19,6 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { UserPlus, ShieldCheck, Briefcase, Eye, EyeOff } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { registerUser } from "@/lib/actions";
 
@@ -45,7 +44,7 @@ const registerFormSchema = registerFormSchemaBase.extend({
   }
   return true;
 }, {
-  message: "El nombre del club debe tener al menos 3 caracteres para administradores.",
+  message: "El nombre de la asociación debe tener al menos 3 caracteres.",
   path: ["clubName"],
 }).refine((data) => {
   if (data.role === "referee") {
@@ -53,7 +52,7 @@ const registerFormSchema = registerFormSchemaBase.extend({
   }
   return true;
 }, {
-  message: "El código de club es requerido para árbitros.",
+  message: "El código de asociación es requerido para árbitros.",
   path: ["clubIdToJoin"],
 });
 
@@ -61,7 +60,6 @@ type RegisterFormValues = z.infer<typeof registerFormSchema>;
 
 export default function RegisterPage() {
   const { toast } = useToast();
-  const router = useRouter();
   const [selectedRole, setSelectedRole] = useState<'admin' | 'referee' | undefined>(undefined);
   const [isPending, startTransition] = useTransition();
   const [showPassword, setShowPassword] = useState(false);
@@ -89,12 +87,6 @@ export default function RegisterPage() {
           description: result.error,
           variant: "destructive",
         });
-      } else {
-        toast({
-          title: "Registro Exitoso",
-          description: "Tu cuenta ha sido creada. Serás redirigido.",
-        });
-        router.refresh();
       }
     });
   }
@@ -108,7 +100,7 @@ export default function RegisterPage() {
             Crear Cuenta
           </CardTitle>
           <CardDescription>
-            Regístrate como administrador de club o como árbitro para unirte a un club existente.
+            Regístrate como administrador de asociación o como árbitro para unirte a una asociación existente.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -137,7 +129,7 @@ export default function RegisterPage() {
                           <FormControl>
                             <RadioGroupItem value="admin" />
                           </FormControl>
-                          <FormLabel className="font-normal flex items-center gap-1"><ShieldCheck size={18}/> Administrador de Club</FormLabel>
+                          <FormLabel className="font-normal flex items-center gap-1"><ShieldCheck size={18}/> Administrador de Asociación</FormLabel>
                         </FormItem>
                         <FormItem className="flex items-center space-x-3 space-y-0">
                           <FormControl>
@@ -158,9 +150,9 @@ export default function RegisterPage() {
                   name="clubName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Nombre del Club a Crear</FormLabel>
+                      <FormLabel>Asociación a la que pertenece</FormLabel>
                       <FormControl>
-                        <Input placeholder="Ej: Liga Barrial Sol Naciente" {...field} />
+                        <Input placeholder="Ej: Liga Regional de Fútbol" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -174,7 +166,7 @@ export default function RegisterPage() {
                   name="clubIdToJoin"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Código de Club para Unirse</FormLabel>
+                      <FormLabel>Código de Asociación para Unirse</FormLabel>
                       <FormControl>
                         <Input placeholder="Ingresa el código proporcionado por el administrador" {...field} />
                       </FormControl>

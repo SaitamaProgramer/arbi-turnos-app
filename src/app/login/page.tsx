@@ -18,7 +18,6 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { LogIn, Eye, EyeOff } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { login } from "@/lib/actions";
 import { useTransition, useState } from "react";
 
@@ -32,7 +31,6 @@ type LoginFormValues = z.infer<typeof loginFormSchema>;
 
 export default function LoginPage() {
   const { toast } = useToast();
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showPassword, setShowPassword] = useState(false);
 
@@ -53,13 +51,6 @@ export default function LoginPage() {
           description: result.error,
           variant: "destructive",
         });
-      } else {
-         toast({
-          title: "Inicio de Sesión Exitoso",
-        });
-        // The server action will handle redirection via a cookie, 
-        // so we just need to refresh the page to let the new layout take effect.
-        router.refresh();
       }
     });
   }

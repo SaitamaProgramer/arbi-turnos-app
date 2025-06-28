@@ -35,12 +35,12 @@ export default function AdminDashboard({ allRefereesInClub, shiftRequestsForClub
     <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total de Árbitros en el Club</CardTitle>
+          <CardTitle className="text-sm font-medium">Total de Árbitros en la Asociación</CardTitle>
           <Users className="h-4 w-4 text-muted-foreground" />
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{totalReferees}</div>
-          <p className="text-xs text-muted-foreground">Árbitros registrados en este club.</p>
+          <p className="text-xs text-muted-foreground">Árbitros registrados en esta asociación.</p>
         </CardContent>
       </Card>
        <Card>

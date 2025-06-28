@@ -4,18 +4,19 @@ import 'server-only';
 
 import { db } from './db';
 import type { Club, ClubSpecificMatch, MatchAssignment, RegisterUserPayload, ShiftRequest, ShiftRequestWithMatches, User } from '@/types';
-import { createSession, deleteSession } from './session';
+import { createSession, deleteSession, getUserFromSession } from './session';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { isPostulationEditable } from './utils';
 import type { ResultSet } from '@libsql/client';
-import { createHmac } from 'crypto';
+import { createHmac, randomBytes } from 'crypto';
 
 // This is a utility for hashing passwords. We'll use the built-in crypto module.
 async function hashPassword(password: string): Promise<string> {
     const secret = process.env.PASSWORD_SECRET;
     if (!secret) {
-        throw new Error('PASSWORD_SECRET environment variable is not set');
+        console.error('PASSWORD_SECRET environment variable is not set');
+        throw new Error('La configuración del servidor está incompleta. No se pudo procesar la contraseña.');
     }
     // Using HMAC for keyed hashing, which is a good practice.
     const hash = createHmac('sha256', secret)
@@ -45,6 +46,8 @@ export async function registerUser(payload: RegisterUserPayload) {
         return { error: 'Datos de registro inválidos.' };
     }
     const { name, email, password, role, clubName, clubIdToJoin } = validation.data;
+    const newUserId = `user_${randomBytes(16).toString('hex')}`;
+    let userRoleForRedirect: 'admin' | 'referee';
 
     try {
         const existingUserResult = await db.execute({
@@ -56,14 +59,13 @@ export async function registerUser(payload: RegisterUserPayload) {
         }
 
         const hashedPassword = await hashPassword(password);
-        const newUserId = `user_${crypto.randomUUID()}`;
         
         const tx = await db.transaction('write');
         try {
             if (role === 'admin') {
-                if (!clubName) throw new Error('El nombre del club es requerido para administradores.');
-                
-                const newClubId = `club_${crypto.randomUUID()}`;
+                if (!clubName) throw new Error('El nombre de la asociación es requerido para administradores.');
+                userRoleForRedirect = 'admin';
+                const newClubId = `club_${randomBytes(16).toString('hex')}`;
 
                 await tx.execute({
                     sql: 'INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)',
@@ -71,15 +73,15 @@ export async function registerUser(payload: RegisterUserPayload) {
                 });
                 await tx.execute({
                     sql: 'INSERT INTO clubs (id, name, admin_user_id) VALUES (?, ?, ?)',
-                    args: [newClubId, name, newUserId]
+                    args: [newClubId, clubName, newUserId]
                 });
 
             } else { // role === 'referee'
-                if (!clubIdToJoin) throw new Error('El código de club es requerido para árbitros.');
-
+                if (!clubIdToJoin) throw new Error('El código de asociación es requerido para árbitros.');
+                userRoleForRedirect = 'referee';
                 const clubResult = await tx.execute({ sql: 'SELECT id FROM clubs WHERE id = ?', args: [clubIdToJoin] });
                 if (clubResult.rows.length === 0) {
-                    throw new Error('El código de club no es válido.');
+                    throw new Error('El código de asociación no es válido.');
                 }
                 
                 await tx.execute({
@@ -94,17 +96,18 @@ export async function registerUser(payload: RegisterUserPayload) {
             await tx.commit();
         } catch (err: any) {
             await tx.rollback();
-            // This will catch the specific error message from the transaction block
             return { error: err.message || 'Ocurrió un error en la base de datos.' };
         }
 
         await createSession(newUserId);
-        return { success: true };
 
     } catch (e: any) {
-        console.error("Registration error:", e);
-        return { error: 'Ocurrió un error en el servidor.' };
+        console.error("Error en registerUser:", e);
+        return { error: `Ocurrió un error en el servidor: ${e.message}` };
     }
+
+    const destination = userRoleForRedirect === 'admin' ? '/admin' : '/';
+    redirect(destination);
 }
 
 
@@ -119,30 +122,33 @@ export async function login(payload: z.infer<typeof loginSchema>) {
         return { error: 'Datos de inicio de sesión inválidos.' };
     }
     const { email, password } = validation.data;
+    let userFromDb: User;
 
     try {
         const result = await db.execute({
-            sql: 'SELECT id, password FROM users WHERE email = ?',
+            sql: 'SELECT id, password, role FROM users WHERE email = ?',
             args: [email]
         });
-        const user = result.rows[0] as User | undefined;
         
-        if (!user || !user.password) {
+        if (result.rows.length === 0) {
             return { error: 'Correo electrónico o contraseña incorrectos.' };
         }
+        
+        userFromDb = result.rows[0] as User;
 
-        const passwordMatch = await verifyPassword(password, user.password);
+        const passwordMatch = await verifyPassword(password, userFromDb.password as string);
         if (!passwordMatch) {
             return { error: 'Correo electrónico o contraseña incorrectos.' };
         }
-
-        await createSession(user.id);
+        
+        await createSession(userFromDb.id);
         
     } catch (e: any) {
-        console.error("Login error:", e);
-        return { error: 'Ocurrió un error en el servidor.' };
+        console.error("Error en login:", e);
+        return { error: `Ocurrió un error en el servidor: ${e.message}` };
     }
-    redirect('/');
+    
+    redirect(userFromDb.role === 'admin' ? '/admin' : '/');
 }
 
 export async function logout() {
@@ -193,7 +199,7 @@ export async function getAdminPageData(clubId: string) {
         const shiftRequestsRaw = shiftRequestsRawResult.rows;
 
         const definedMatchesResult = await db.execute({
-            sql: 'SELECT * FROM club_matches WHERE club_id = ? ORDER BY match_date, match_time',
+            sql: 'SELECT id, club_id, description, match_date as date, match_time as time, location FROM club_matches WHERE club_id = ? ORDER BY date, time',
             args: [clubId]
         });
         const definedMatches = rowsToType<ClubSpecificMatch>(definedMatchesResult.rows);
@@ -245,22 +251,55 @@ export async function getAdminPageData(clubId: string) {
 }
 
 export async function saveClubDefinedMatches(clubId: string, matches: Omit<ClubSpecificMatch, 'clubId'>[]) {
+    const user = await getUserFromSession();
+    if (!user || user.role !== 'admin' || user.administeredClubId !== clubId) {
+        return { success: false, error: 'No tienes permiso para realizar esta acción.' };
+    }
+    
     const tx = await db.transaction('write');
     try {
-        await tx.execute({ sql: 'DELETE FROM club_matches WHERE club_id = ?', args: [clubId] });
+        // First, get all existing matches for the club
+        const existingMatchesResult = await tx.execute({ sql: 'SELECT id FROM club_matches WHERE club_id = ?', args: [clubId]});
+        const existingMatchIds = new Set(existingMatchesResult.rows.map(r => r.id as string));
+        const incomingMatchIds = new Set(matches.map(m => m.id));
+
+        // Find matches to delete (exist in DB but not in new list)
+        const matchesToDelete = [...existingMatchIds].filter(id => !incomingMatchIds.has(id));
+
+        if (matchesToDelete.length > 0) {
+            // Before deleting matches, we need to delete related assignments to avoid foreign key constraints
+            const deleteAssignmentsSql = `DELETE FROM match_assignments WHERE match_id IN (${matchesToDelete.map(() => '?').join(',')})`;
+            await tx.execute({ sql: deleteAssignmentsSql, args: matchesToDelete });
+
+            // Now delete the matches
+            const deleteMatchesSql = `DELETE FROM club_matches WHERE id IN (${matchesToDelete.map(() => '?').join(',')})`;
+            await tx.execute({ sql: deleteMatchesSql, args: matchesToDelete });
+        }
         
         for (const match of matches) {
-            await tx.execute({
-                sql: 'INSERT INTO club_matches (id, club_id, description, match_date, match_time, location) VALUES (?, ?, ?, ?, ?, ?)',
-                args: [match.id, clubId, match.description, match.date, match.time, match.location]
-            });
+            const matchDate = match.date;
+            const matchTime = match.time;
+
+            if (existingMatchIds.has(match.id)) {
+                // Update existing match
+                 await tx.execute({
+                    sql: 'UPDATE club_matches SET description = ?, match_date = ?, match_time = ?, location = ? WHERE id = ? AND club_id = ?',
+                    args: [match.description, matchDate, matchTime, match.location, match.id, clubId]
+                });
+            } else {
+                // Insert new match
+                await tx.execute({
+                    sql: 'INSERT INTO club_matches (id, club_id, description, match_date, match_time, location) VALUES (?, ?, ?, ?, ?, ?)',
+                    args: [match.id, clubId, match.description, matchDate, matchTime, match.location]
+                });
+            }
         }
         await tx.commit();
         return { success: true };
     } catch(e: any) {
         await tx.rollback();
         console.error("saveClubDefinedMatches error", e);
-        return { error: 'No se pudieron guardar los partidos.' };
+        return { success: false, error: 'No se pudieron guardar los partidos.' };
     }
 }
 
@@ -287,7 +326,7 @@ export async function getAvailabilityFormData(userId: string) {
         
         for (const club of clubs) {
              const matchesResult = await db.execute({
-                 sql: 'SELECT * FROM club_matches WHERE club_id = ? ORDER BY match_date, match_time',
+                 sql: 'SELECT id, club_id, description, match_date as date, match_time as time, location FROM club_matches WHERE club_id = ? ORDER BY date, time',
                  args: [club.id]
              });
              const matches = rowsToType<ClubSpecificMatch>(matchesResult.rows);
@@ -351,8 +390,11 @@ export async function submitAvailability(payload: z.infer<typeof availabilitySch
     }
     const { selectedMatchIds, hasCar, notes, selectedClubId } = validation.data;
     
-    const session = await createSession(); // Gets current user or redirects
-    const userId = session.userId;
+    const user = await getUserFromSession();
+    if (!user) {
+        return { error: 'Sesión no válida. Por favor, inicie sesión de nuevo.' };
+    }
+    const userId = user.id;
 
     try {
         const existingResult = await db.execute({
@@ -360,10 +402,10 @@ export async function submitAvailability(payload: z.infer<typeof availabilitySch
             args: [userId, selectedClubId]
         });
         if (existingResult.rows.length > 0) {
-            return { error: "Ya tienes una postulación pendiente para este club. Por favor, edítala." };
+            return { error: "Ya tienes una postulación pendiente para esta asociación. Por favor, edítala." };
         }
 
-        const requestId = `req_${crypto.randomUUID()}`;
+        const requestId = `req_${randomBytes(16).toString('hex')}`;
         const submittedAt = new Date().toISOString();
 
         const tx = await db.transaction('write');
@@ -399,8 +441,11 @@ export async function updateAvailability(requestId: string, payload: z.infer<typ
     }
     const { selectedMatchIds, hasCar, notes, selectedClubId } = validation.data;
     
-    const session = await createSession();
-    const userId = session.userId;
+    const user = await getUserFromSession();
+    if (!user) {
+        return { error: 'Sesión no válida. Por favor, inicie sesión de nuevo.' };
+    }
+    const userId = user.id;
 
     try {
         const requestResult = await db.execute({
@@ -421,7 +466,7 @@ export async function updateAvailability(requestId: string, payload: z.infer<typ
 
         if (matchIdsInRequest.length > 0) {
             const matchesInRequestDataResult = await db.execute({
-                sql: `SELECT * FROM club_matches WHERE id IN (${matchIdsInRequest.map(() => '?').join(',')})`,
+                sql: `SELECT id, club_id, description, match_date as date, match_time as time, location FROM club_matches WHERE id IN (${matchIdsInRequest.map(() => '?').join(',')})`,
                 args: [...matchIdsInRequest]
             });
             const matchesInRequest = rowsToType<ClubSpecificMatch>(matchesInRequestDataResult.rows);
@@ -470,7 +515,7 @@ export async function updateAvailability(requestId: string, payload: z.infer<typ
 export async function assignRefereeToMatch(clubId: string, matchId: string, refereeId: string) {
     try {
         const matchToAssignResult = await db.execute({
-            sql: 'SELECT * FROM club_matches WHERE id = ?',
+            sql: 'SELECT id, club_id, description, match_date as date, match_time as time, location FROM club_matches WHERE id = ?',
             args: [matchId]
         });
         const matchToAssign = rowsToType<ClubSpecificMatch>(matchToAssignResult.rows)[0];
@@ -490,7 +535,7 @@ export async function assignRefereeToMatch(clubId: string, matchId: string, refe
 
         for (const row of refereeAssignmentsResult.rows) {
              const currentAsg = rowsToType<any>([row])[0];
-             if (currentAsg.matchDate === matchToAssign.date && currentAsg.matchTime === matchToAssign.time) {
+             if (currentAsg.date === matchToAssign.date && currentAsg.time === matchToAssign.time) {
                 return { error: `Este árbitro ya está asignado a "${currentAsg.description}" a la misma fecha y hora.` };
              }
         }
@@ -532,3 +577,5 @@ export async function unassignRefereeFromMatch(clubId: string, matchId: string) 
         return { error: 'No se pudo quitar la asignación.' };
     }
 }
+
+    

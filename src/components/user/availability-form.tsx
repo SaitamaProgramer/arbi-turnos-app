@@ -39,7 +39,7 @@ const availabilityFormSchema = z.object({
   }),
   hasCar: z.string({ required_error: "Por favor, indica si tienes auto." }),
   notes: z.string().max(500, "Las notas no pueden exceder los 500 caracteres.").optional(),
-  selectedClubId: z.string({ required_error: "Debes seleccionar un club." }), 
+  selectedClubId: z.string({ required_error: "Debes seleccionar una asociación." }), 
 });
 
 type AvailabilityFormValues = z.infer<typeof availabilityFormSchema>;
@@ -147,8 +147,8 @@ export default function AvailabilityForm({ initialData, user }: AvailabilityForm
         </CardHeader>
         <CardContent className="text-center py-10">
           <AlertTriangle className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
-          <p className="text-xl font-semibold text-muted-foreground mb-2">No Asociado a Clubes</p>
-          <p>Contacta a un administrador para unirte a un club o verifica tu registro.</p>
+          <p className="text-xl font-semibold text-muted-foreground mb-2">No Perteneces a Ninguna Asociación</p>
+          <p>Contacta a un administrador para unirte a una asociación o verifica tu registro.</p>
         </CardContent>
       </Card>
     );
@@ -237,8 +237,8 @@ export default function AvailabilityForm({ initialData, user }: AvailabilityForm
           {isEditing ? "Editar Postulación Enviada" : "Postularse a Partidos/Turnos"}
         </CardTitle>
         <CardDescription>
-          {userClubs.length > 1 && "Selecciona un club. "}
-          {isEditing ? "Modifica los detalles de tu postulación para el club:" : "Selecciona los partidos/turnos a los que deseas postularte para el club:"}
+          {userClubs.length > 1 && "Selecciona una asociación. "}
+          {isEditing ? "Modifica los detalles de tu postulación para la asociación:" : "Selecciona los partidos/turnos a los que deseas postularte para la asociación:"}
           <strong className="ml-1">{activeClubData?.name || ''}</strong>.
           {isEditing && <span className="block text-xs text-accent mt-1 italic"><Info size={12} className="inline mr-1"/>Estás editando una postulación previamente enviada.</span>}
           {!canEditCurrentPostulation && isEditing && (
@@ -257,7 +257,7 @@ export default function AvailabilityForm({ initialData, user }: AvailabilityForm
                 name="selectedClubId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base flex items-center gap-2"><Users className="text-primary"/>Seleccionar Club</FormLabel>
+                    <FormLabel className="text-base flex items-center gap-2"><Users className="text-primary"/>Seleccionar Asociación</FormLabel>
                     <Select 
                       onValueChange={(value) => {field.onChange(value); handleClubChange(value);}} 
                       value={field.value}
@@ -265,7 +265,7 @@ export default function AvailabilityForm({ initialData, user }: AvailabilityForm
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue placeholder="Selecciona el club" />
+                          <SelectValue placeholder="Selecciona la asociación" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
@@ -285,9 +285,9 @@ export default function AvailabilityForm({ initialData, user }: AvailabilityForm
             {!activeClubId && userClubs.length > 0 && (
                  <div className="text-center py-6">
                     <AlertTriangle className="mx-auto h-10 w-10 text-yellow-500 mb-3" />
-                    <p className="text-lg font-semibold text-muted-foreground mb-1">Selecciona un Club</p>
+                    <p className="text-lg font-semibold text-muted-foreground mb-1">Selecciona una Asociación</p>
                     <p className="text-xs text-muted-foreground">
-                        Por favor, selecciona un club de la lista de arriba para continuar.
+                        Por favor, selecciona una asociación de la lista de arriba para continuar.
                     </p>
                  </div>
             )}
@@ -299,7 +299,7 @@ export default function AvailabilityForm({ initialData, user }: AvailabilityForm
                    No hay Partidos Definidos para {activeClubData?.name}
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  El administrador del club aún no ha definido partidos/turnos.
+                  El administrador de la asociación aún no ha definido partidos/turnos.
                 </p>
               </div>
             )}
@@ -438,3 +438,5 @@ export default function AvailabilityForm({ initialData, user }: AvailabilityForm
     </Card>
   );
 }
+
+    
