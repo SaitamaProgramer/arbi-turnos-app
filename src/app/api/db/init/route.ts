@@ -2,6 +2,18 @@
 import { db } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
+// Este array contiene los comandos para borrar las tablas. El orden es inverso a la creación.
+const schemaDestructionCommands = [
+  'DROP TABLE IF EXISTS match_assignments;',
+  'DROP TABLE IF EXISTS shift_request_matches;',
+  'DROP TABLE IF EXISTS suggestions;',
+  'DROP TABLE IF EXISTS shift_requests;',
+  'DROP TABLE IF EXISTS club_matches;',
+  'DROP TABLE IF EXISTS user_clubs_membership;',
+  'DROP TABLE IF EXISTS clubs;',
+  'DROP TABLE IF EXISTS users;',
+];
+
 // Este array contiene todos los comandos SQL necesarios para crear el esquema de la base de datos.
 // El orden es importante debido a las claves foráneas (foreign keys).
 const schemaCreationCommands = [
@@ -32,6 +44,7 @@ const schemaCreationCommands = [
     match_date TEXT NOT NULL,
     match_time TEXT NOT NULL,
     location TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'scheduled' CHECK(status IN ('scheduled', 'cancelled', 'postponed')),
     FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
   );`,
   `CREATE TABLE IF NOT EXISTS shift_requests (
@@ -75,15 +88,18 @@ const schemaCreationCommands = [
 
 export async function GET() {
   try {
-    console.log('Iniciando la inicialización de la base de datos...');
+    console.log('Reiniciando la base de datos... Borrando tablas existentes.');
+    for (const command of schemaDestructionCommands) {
+      await db.execute(command);
+    }
     
-    // Ejecutar cada comando de creación de tabla de forma secuencial.
+    console.log('Creando nuevo esquema de base de datos...');
     for (const command of schemaCreationCommands) {
       await db.execute(command);
     }
 
     console.log('La base de datos se ha inicializado correctamente.');
-    return NextResponse.json({ message: 'La base de datos se ha inicializado correctamente.' });
+    return NextResponse.json({ message: 'La base de datos se ha reiniciado y actualizado correctamente.' });
   } catch (error) {
     console.error('Error durante la inicialización de la base de datos:', error);
     // Asegurarse de que el error se capture y se devuelva en un formato JSON legible

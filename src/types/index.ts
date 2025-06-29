@@ -6,6 +6,7 @@ export interface ClubSpecificMatch {
   date: string; // ISO string for date, e.g., "2024-07-28T00:00:00.000Z" or just "2024-07-28"
   time: string; // e.g., "15:00"
   location: string;
+  status: 'scheduled' | 'cancelled' | 'postponed';
 }
 
 export interface ShiftRequest {
@@ -80,5 +81,6 @@ export interface Suggestion {
 export interface UserStats {
   associationsCount: number;
   refereedMatchesCount: number;
+  cancelledMatchesCount: number;
   postulationsCount: number;
 }

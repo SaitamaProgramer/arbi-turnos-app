@@ -5,7 +5,7 @@ import type { ShiftRequestWithMatches, MatchAssignment } from "@/types";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, Car, ClipboardList, CheckSquare, Edit3, Ban, BadgeCheck } from "lucide-react";
+import { CalendarDays, Car, ClipboardList, CheckSquare, Edit3, Ban, BadgeCheck, Clock } from "lucide-react";
 import { format, parseISO } from "date-fns";
 import { es } from "date-fns/locale";
 
@@ -46,11 +46,23 @@ export default function PostulationSummary({ clubName, postulation, assignments,
                             </p>
                             <p className="text-sm text-muted-foreground">Lugar: {match.location}</p>
                         </div>
-                        {isAssignedToThisMatch && (
-                            <Badge variant="default" className="bg-green-500 text-white whitespace-nowrap mt-1">
-                            <BadgeCheck size={14} className="mr-1" /> Asignado
-                            </Badge>
-                        )}
+                        <div className="flex flex-col items-end gap-1 text-xs">
+                          {isAssignedToThisMatch && (
+                              <Badge variant="default" className="bg-green-500 hover:bg-green-500 text-white whitespace-nowrap">
+                              <BadgeCheck size={14} className="mr-1" /> Asignado
+                              </Badge>
+                          )}
+                           {match.status === 'cancelled' && (
+                              <Badge variant="destructive" className="whitespace-nowrap">
+                                  <Ban size={14} className="mr-1" /> Cancelado
+                              </Badge>
+                          )}
+                          {match.status === 'postponed' && (
+                              <Badge variant="outline" className="border-yellow-500 text-yellow-600 whitespace-nowrap">
+                                  <Clock size={14} className="mr-1" /> Pospuesto
+                              </Badge>
+                          )}
+                        </div>
                         </div>
                     </li>
                     );
@@ -85,5 +97,3 @@ export default function PostulationSummary({ clubName, postulation, assignments,
     </div>
   );
 }
-
-    
