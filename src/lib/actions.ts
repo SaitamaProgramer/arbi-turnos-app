@@ -4,7 +4,7 @@ import 'server-only';
 
 import { db } from './db';
 import type { Club, ClubSpecificMatch, MatchAssignment, RegisterUserPayload, ShiftRequest, ShiftRequestWithMatches, Suggestion, User } from '@/types';
-import { getUserFromSession, createSession, deleteSession } from './session';
+import { getUserFromSession, createSession, deleteSession, getFullUserFromDb } from './session';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { isPostulationEditable, rowsToType } from './utils';
@@ -32,7 +32,8 @@ async function verifyPassword(password: string, hash: string): Promise<boolean> 
 const registerSchema = z.object({
   name: z.string().min(2),
   email: z.string().email(),
-  password: z.string().min(6),
+  password: z.string().min(6)
+    .regex(/^(?=.*[A-Z])(?=.*\d).+$/, { message: "La contraseña debe contener al menos una letra mayúscula y un número." }),
   role: z.enum(['admin', 'referee']),
   clubName: z.string().optional(),
   clubIdToJoin: z.string().optional(),
@@ -686,4 +687,51 @@ export async function joinAnotherClub(clubIdToJoin: string) {
     }
 }
 
+const changePasswordSchema = z.object({
+  currentPassword: z.string(),
+  newPassword: z.string().min(6),
+});
+
+export async function changePassword(payload: z.infer<typeof changePasswordSchema>) {
+    const user = await getUserFromSession();
+    if (!user) {
+        return { success: false, error: "Debes iniciar sesión para cambiar tu contraseña." };
+    }
+
+    const validation = changePasswordSchema.safeParse(payload);
+    if (!validation.success) {
+        return { success: false, error: "Los datos proporcionados no son válidos." };
+    }
     
+    const { currentPassword, newPassword } = validation.data;
+    
+    try {
+        const userWithPasswordResult = await db.execute({
+            sql: 'SELECT password FROM users WHERE id = ?',
+            args: [user.id]
+        });
+        
+        const userWithPassword = rowsToType<{password: string}>(userWithPasswordResult.rows)[0];
+        if (!userWithPassword) {
+            return { success: false, error: "No se encontró al usuario." };
+        }
+        
+        const isPasswordCorrect = await verifyPassword(currentPassword, userWithPassword.password);
+        if (!isPasswordCorrect) {
+            return { success: false, error: "La contraseña actual es incorrecta." };
+        }
+        
+        const newHashedPassword = await hashPassword(newPassword);
+        
+        await db.execute({
+            sql: 'UPDATE users SET password = ? WHERE id = ?',
+            args: [newHashedPassword, user.id]
+        });
+        
+        return { success: true };
+
+    } catch (e: any) {
+        console.error("changePassword error:", e);
+        return { success: false, error: "Ocurrió un error al cambiar la contraseña." };
+    }
+}

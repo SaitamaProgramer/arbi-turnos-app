@@ -1,6 +1,6 @@
 
 import Link from 'next/link';
-import { UsersRound, LogIn, UserPlus, LogOut, ShieldCheck } from 'lucide-react';
+import { UsersRound, LogIn, UserPlus, LogOut, ShieldCheck, UserCog } from 'lucide-react';
 import { getUserFromSession } from '@/lib/session';
 import { Button } from '@/components/ui/button';
 import { logout } from '@/lib/actions';
@@ -28,7 +28,7 @@ export default async function Navbar() {
           <h1 className="text-2xl font-bold">ArbiTurnos</h1>
         </Link>
         <div className="space-x-1 sm:space-x-2 flex items-center">
-          {currentUser && (
+          {currentUser && currentUser.role !== 'admin' && (
             <Link href="/" className="text-foreground hover:text-primary transition-colors font-medium text-sm sm:text-base">
               Disponibilidad
             </Link>
@@ -45,6 +45,10 @@ export default async function Navbar() {
 
           {currentUser ? (
             <>
+              <Link href="/account" className="text-foreground hover:text-primary transition-colors font-medium text-sm sm:text-base inline-flex items-center">
+                <UserCog size={18} className="mr-1 sm:mr-2" />
+                Mi Cuenta
+              </Link>
               <span className="text-sm text-muted-foreground hidden sm:inline">Hola, {currentUser.name.split(' ')[0]}</span>
               <LogoutButton />
             </>

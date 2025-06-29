@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -28,7 +29,7 @@ const registerFormSchemaBase = z.object({
   email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),
   password: z.string()
     .min(6, { message: "La contraseña debe tener al menos 6 caracteres." })
-    .regex(/^(?=.*[a-zA-Z])(?=.*\d).*$/, { message: "La contraseña debe contener al menos una letra y un número." }),
+    .regex(/^(?=.*[A-Z])(?=.*\d).+$/, { message: "La contraseña debe contener al menos una letra mayúscula y un número." }),
   confirmPassword: z.string(),
   role: z.enum(["admin", "referee"], { required_error: "Debes seleccionar un rol." }),
 });
@@ -236,6 +237,9 @@ export default function RegisterPage() {
                         {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </button>
                     </div>
+                    <FormDescription>
+                      Mínimo 6 caracteres, 1 mayúscula y 1 número.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
