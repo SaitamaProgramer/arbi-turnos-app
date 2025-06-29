@@ -16,7 +16,7 @@ const authToken = process.env.TURSO_AUTH_TOKEN;
 
 let isLocalDb = false;
 // Developer-friendly fallback to a local file database if Turso URL is not set or is a placeholder
-if (!url || url.includes('your-db-name')) {
+if (!url || url.includes('tu_url_de_turso')) {
   isLocalDb = true;
   url = 'file:arbitros.db';
 }

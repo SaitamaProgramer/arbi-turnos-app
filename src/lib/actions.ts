@@ -106,7 +106,7 @@ export async function registerUser(payload: RegisterUserPayload) {
     }
 
     const destination = userRoleForRedirect === 'admin' ? '/admin' : '/';
-    redirect(destination);
+    return { success: true, redirectUrl: destination };
 }
 
 
@@ -147,7 +147,8 @@ export async function login(payload: z.infer<typeof loginSchema>) {
         return { error: `Ocurrió un error en el servidor: ${e.message}` };
     }
     
-    redirect(userFromDb.role === 'admin' ? '/admin' : '/');
+    const redirectUrl = userFromDb.role === 'admin' ? '/admin' : '/';
+    return { success: true, redirectUrl };
 }
 
 export async function logout() {
