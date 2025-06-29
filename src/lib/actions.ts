@@ -637,4 +637,53 @@ export async function submitSuggestion(suggestionText: string) {
     }
 }
 
+export async function joinAnotherClub(clubIdToJoin: string) {
+    const user = await getUserFromSession();
+    if (!user || user.role !== 'referee') {
+        return { success: false, error: 'Solo los árbitros pueden unirse a asociaciones.' };
+    }
+    const userId = user.id;
+
+    const clubIdToJoinTrimmed = clubIdToJoin.trim();
+    if (!clubIdToJoinTrimmed) {
+        return { success: false, error: 'El código de asociación no puede estar vacío.' };
+    }
+
+    try {
+        const tx = await db.transaction('write');
+        try {
+            const clubResult = await tx.execute({ sql: 'SELECT id FROM clubs WHERE id = ?', args: [clubIdToJoinTrimmed] });
+            if (clubResult.rows.length === 0) {
+                await tx.rollback();
+                return { success: false, error: 'El código de asociación no es válido.' };
+            }
+
+            const membershipResult = await tx.execute({
+                sql: 'SELECT user_id FROM user_clubs_membership WHERE user_id = ? AND club_id = ?',
+                args: [userId, clubIdToJoinTrimmed]
+            });
+
+            if (membershipResult.rows.length > 0) {
+                await tx.rollback();
+                return { success: false, error: 'Ya eres miembro de esta asociación.' };
+            }
+
+            await tx.execute({
+                sql: 'INSERT INTO user_clubs_membership (user_id, club_id) VALUES (?, ?)',
+                args: [userId, clubIdToJoinTrimmed]
+            });
+            await tx.commit();
+        } catch (err: any) {
+            await tx.rollback();
+            throw err;
+        }
+
+        return { success: true, newClubId: clubIdToJoinTrimmed };
+
+    } catch (e: any) {
+        console.error("joinAnotherClub error:", e);
+        return { success: false, error: 'Ocurrió un error al intentar unirte a la asociación.' };
+    }
+}
+
     

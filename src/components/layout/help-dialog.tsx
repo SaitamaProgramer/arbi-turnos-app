@@ -50,7 +50,7 @@ export function HelpDialog() {
                 <h3 className="font-semibold text-lg">2. Postularte a Turnos</h3>
                 <p>Una vez que inicies sesión, irás a la página de "Disponibilidad".</p>
                 <ul className="list-disc pl-5 space-y-1">
-                    <li>Si perteneces a varias asociaciones, usa el menú desplegable para seleccionar la asociación correcta.</li>
+                    <li><strong>Si perteneces a varias asociaciones, usa el menú desplegable para seleccionar la correcta.</strong> La página se actualizará para mostrar los partidos de esa asociación.</li>
                     <li>Verás una lista de todos los partidos o turnos disponibles definidos por el administrador.</li>
                     <li>Marca las casillas de todos los partidos para los que deseas postularte.</li>
                     <li>Indica si dispones de auto (esto ayuda al administrador con la logística).</li>
@@ -58,9 +58,17 @@ export function HelpDialog() {
                     <li>Haz clic en <strong>"Enviar Postulación"</strong>.</li>
                 </ul>
 
-                <h3 className="font-semibold text-lg">3. Consultar y Editar tu Postulación</h3>
+                <h3 className="font-semibold text-lg">3. Unirte a más Asociaciones</h3>
+                <p>Si ya tienes una cuenta, puedes unirte a otras asociaciones fácilmente.</p>
+                <ul className="list-disc pl-5 space-y-1">
+                    <li>En la página de "Disponibilidad", verás una sección para unirte a una nueva asociación.</li>
+                    <li>Pídele el <strong>"Código de Asociación"</strong> al administrador de la nueva liga.</li>
+                    <li>Ingresa el código y haz clic en "Unirse". ¡Listo! La nueva asociación aparecerá en tu menú desplegable.</li>
+                </ul>
+
+                <h3 className="font-semibold text-lg">4. Consultar y Editar tu Postulación</h3>
                  <ul className="list-disc pl-5 space-y-1">
-                    <li>Después de enviar, verás un resumen de tu postulación.</li>
+                    <li>Después de enviar, verás un resumen de tu postulación para la asociación seleccionada.</li>
                     <li>Puedes volver a esta página en cualquier momento para ver a qué partidos te has postulado y si ya te han asignado a alguno (aparecerá una insignia verde de "Asignado").</li>
                     <li>Si necesitas cambiar tu disponibilidad, puedes hacer clic en <strong>"Editar Postulación"</strong>. Esto solo es posible si el partido no está demasiado cerca en la fecha o si aún no te lo han asignado.</li>
                 </ul>
@@ -112,3 +120,5 @@ export function HelpDialog() {
     </Dialog>
   );
 }
+
+    

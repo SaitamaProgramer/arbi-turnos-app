@@ -88,6 +88,7 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
         toast({
           title: isEditing ? "Postulación Actualizada" : "Postulación Enviada",
           description: "Tus datos han sido guardados.",
+          variant: "success",
         });
         router.refresh();
       }
@@ -249,3 +250,5 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
     </>
   );
 }
+
+    
