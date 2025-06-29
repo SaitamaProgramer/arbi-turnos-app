@@ -21,9 +21,9 @@ import { useToast } from "@/hooks/use-toast";
 import { isMatchEditable } from "@/lib/utils";
 import type { ClubSpecificMatch, MatchAssignment, ShiftRequestWithMatches } from "@/types";
 import { ListChecks, Car, ClipboardList, Send, Loader2, AlertTriangle, Edit3, Info, Ban } from "lucide-react";
-import { useTransition } from "react";
+import { useTransition, useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { submitAvailability, updateAvailability } from "@/lib/actions";
@@ -53,6 +53,24 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const isEditing = !!postulation;
+
+  const [nonEditableByDateMatchIds, setNonEditableByDateMatchIds] = useState(new Set<string>());
+
+  const availableMatches = useMemo(() => {
+    const today = startOfDay(new Date());
+    return matches.filter(match => !isBefore(parseISO(match.date), today));
+  }, [matches]);
+  
+  useEffect(() => {
+    const nonEditableIds = new Set<string>();
+    availableMatches.forEach(match => {
+        if (!isMatchEditable(match.date)) {
+            nonEditableIds.add(match.id);
+        }
+    });
+    setNonEditableByDateMatchIds(nonEditableIds);
+  }, [availableMatches]);
+
 
   const form = useForm<AvailabilityFormValues>({
     resolver: zodResolver(availabilityFormSchema),
@@ -95,15 +113,15 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
     });
   }
 
-  if (matches.length === 0) {
+  if (availableMatches.length === 0) {
     return (
       <div className="text-center py-6">
         <AlertTriangle className="mx-auto h-10 w-10 text-yellow-500 mb-3" />
         <p className="text-lg font-semibold text-muted-foreground mb-1">
-          No hay Partidos Definidos para {clubName}
+          No hay Partidos Disponibles para {clubName}
         </p>
         <p className="text-xs text-muted-foreground">
-          El administrador de la asociación aún no ha definido partidos/turnos.
+          El administrador de la asociación no ha definido partidos futuros.
         </p>
       </div>
     );
@@ -134,14 +152,14 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
                   <FormLabel className="text-base flex items-center gap-2"><ListChecks className="text-primary" />Partidos/Turnos Disponibles</FormLabel>
                 </div>
                 <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
-                  {matches.map((match) => (
+                  {availableMatches.map((match) => (
                     <FormField
                       key={match.id}
                       control={form.control}
                       name="selectedMatchIds"
                       render={({ field }) => {
                         const isChecked = field.value?.includes(match.id);
-                        const isThisMatchActuallyEditableByDate = isMatchEditable(match.date);
+                        const isThisMatchActuallyEditableByDate = !nonEditableByDateMatchIds.has(match.id);
                         const isThisMatchAssignedToCurrentUser = assignments.some(asg => asg.matchId === match.id);
                         const disableCheckbox = !canEdit || !isThisMatchActuallyEditableByDate || isThisMatchAssignedToCurrentUser;
 
@@ -250,5 +268,3 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
     </>
   );
 }
-
-    

@@ -76,4 +76,9 @@ export interface Suggestion {
   suggestionText: string;
   submittedAt: string;
 }
-    
+
+export interface UserStats {
+  associationsCount: number;
+  refereedMatchesCount: number;
+  postulationsCount: number;
+}

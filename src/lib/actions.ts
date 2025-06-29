@@ -3,7 +3,7 @@
 import 'server-only';
 
 import { db } from './db';
-import type { Club, ClubSpecificMatch, MatchAssignment, RegisterUserPayload, ShiftRequest, ShiftRequestWithMatches, Suggestion, User } from '@/types';
+import type { Club, ClubSpecificMatch, MatchAssignment, RegisterUserPayload, ShiftRequest, ShiftRequestWithMatches, Suggestion, User, UserStats } from '@/types';
 import { getUserFromSession, createSession, deleteSession, getFullUserFromDb } from './session';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -733,5 +733,54 @@ export async function changePassword(payload: z.infer<typeof changePasswordSchem
     } catch (e: any) {
         console.error("changePassword error:", e);
         return { success: false, error: "Ocurrió un error al cambiar la contraseña." };
+    }
+}
+
+export async function getAccountPageData(userId: string): Promise<{ user: User, stats: UserStats }> {
+    const sessionUser = await getUserFromSession();
+    if (!sessionUser || sessionUser.id !== userId) {
+        throw new Error("No autorizado");
+    }
+
+    try {
+        const associationsPromise = db.execute({
+            sql: `SELECT COUNT(club_id) as count FROM user_clubs_membership WHERE user_id = ?`,
+            args: [userId]
+        });
+
+        const refereedMatchesPromise = db.execute({
+            sql: `SELECT COUNT(id) as count FROM match_assignments WHERE assigned_referee_id = ?`,
+            args: [userId]
+        });
+
+        const postulationsPromise = db.execute({
+            sql: `SELECT COUNT(id) as count FROM shift_requests WHERE user_id = ?`,
+            args: [userId]
+        });
+
+        const [associationsResult, refereedMatchesResult, postulationsResult] = await Promise.all([
+            associationsPromise,
+            refereedMatchesPromise,
+            postulationsPromise
+        ]);
+
+        const stats: UserStats = {
+            associationsCount: Number(associationsResult.rows[0]?.count ?? 0),
+            refereedMatchesCount: Number(refereedMatchesResult.rows[0]?.count ?? 0),
+            postulationsCount: Number(postulationsResult.rows[0]?.count ?? 0)
+        };
+        
+        // Return a fresh user object to ensure data consistency
+        const user = await getFullUserFromDb(userId);
+        if (!user) throw new Error("Usuario no encontrado al obtener datos de la cuenta.");
+
+        return { user, stats };
+    } catch (e) {
+        console.error("Error fetching account page data:", e);
+        // Fallback to ensure the page doesn't crash
+        const user = await getFullUserFromDb(userId);
+        if (!user) throw new Error("Fallo crítico al buscar usuario.");
+
+        return { user, stats: { associationsCount: 0, refereedMatchesCount: 0, postulationsCount: 0 }};
     }
 }

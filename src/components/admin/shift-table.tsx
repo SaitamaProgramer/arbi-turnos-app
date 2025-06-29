@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ShiftRequestWithMatches, ClubSpecificMatch, User, MatchAssignment } from "@/types";
@@ -28,11 +29,12 @@ import {
   assignRefereeToMatch,
   unassignRefereeFromMatch,
 } from "@/lib/actions"; 
-import { UserCheck, UserPlus, Edit, Trash2, Users, CalendarCheck2, AlertTriangle, Loader2 } from "lucide-react";
+import { UserCheck, UserPlus, Edit, Trash2, Users, CalendarCheck2, AlertTriangle, Loader2, CheckCircle, XCircle } from "lucide-react";
 import { useState, useMemo, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface ShiftTableProps {
   clubId: string; 
@@ -71,12 +73,22 @@ export default function ShiftTable({
   const [shiftRequests, setShiftRequests] = useState(initialShiftRequests);
   const [assignments, setAssignments] = useState(initialMatchAssignments);
   
-  // Sincroniza el estado del componente con las props actualizadas después de un router.refresh().
-  // Esto es crucial para que la UI se actualice después de una acción del servidor.
+  const [pastMatchIds, setPastMatchIds] = useState(new Set<string>());
+
   useEffect(() => {
-    setDefinedMatches(initialDefinedMatches);
+    setDefinedMatches(initialDefinedMatches.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()));
     setShiftRequests(initialShiftRequests);
     setAssignments(initialMatchAssignments);
+
+    const today = startOfDay(new Date());
+    const pastIds = new Set<string>();
+    initialDefinedMatches.forEach(match => {
+        if (isBefore(parseISO(match.date), today)) {
+            pastIds.add(match.id);
+        }
+    });
+    setPastMatchIds(pastIds);
+
   }, [initialDefinedMatches, initialShiftRequests, initialMatchAssignments]);
   
   const getRefereeNameById = (userId: string) => initialClubReferees.find(u => u.id === userId)?.name || 'Desconocido';
@@ -124,6 +136,7 @@ export default function ShiftTable({
           toast({
             title: "Árbitro Asignado",
             description: `${getRefereeNameById(selectedRefereeId) || selectedRefereeId} ha sido asignado.`,
+            variant: 'success'
           });
           router.refresh(); 
         } else {
@@ -186,9 +199,10 @@ export default function ShiftTable({
             const postulatedRefereeDetails = postulatedRefereesByMatchId.get(match.id) || [];
             const assignment = assignments.find(a => a.matchId === match.id);
             const assignedRefereeName = assignment ? getRefereeNameById(assignment.assignedRefereeId) : null;
+            const isPast = pastMatchIds.has(match.id);
 
             return (
-              <TableRow key={match.id}>
+              <TableRow key={match.id} className={cn(isPast && "bg-muted/40 opacity-70")}>
                 <TableCell className="font-medium align-top pt-3">
                   <p className="font-semibold">{match.description}</p>
                   <p className="text-xs text-muted-foreground">
@@ -217,7 +231,17 @@ export default function ShiftTable({
                   )}
                 </TableCell>
                 <TableCell className="text-right align-top pt-3">
-                  {assignment ? (
+                   {isPast ? (
+                      assignment ? (
+                        <Badge variant="outline" className="text-green-600 border-green-600">
+                          <CheckCircle className="mr-1 h-3 w-3" /> Finalizado
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary">
+                          <XCircle className="mr-1 h-3 w-3" /> Expirado
+                        </Badge>
+                      )
+                  ) : assignment ? (
                     <div className="flex flex-col items-end gap-1.5">
                       <Badge variant="default" className="bg-primary text-primary-foreground text-xs whitespace-nowrap self-end mb-1 px-2 py-1">
                         <UserCheck className="mr-1 h-3 w-3" /> Asignado: {assignedRefereeName}
@@ -242,7 +266,7 @@ export default function ShiftTable({
                       <UserPlus className="mr-1 h-3 w-3" /> Asignar Árbitro
                     </Button>
                   )}
-                   {postulatedRefereeDetails.length === 0 && !assignment && (
+                   {postulatedRefereeDetails.length === 0 && !assignment && !isPast && (
                      <p className="text-xs text-muted-foreground mt-1 italic text-right">Esperando postulantes.</p>
                    )}
                 </TableCell>
@@ -305,5 +329,3 @@ export default function ShiftTable({
     </div>
   );
 }
-
-    

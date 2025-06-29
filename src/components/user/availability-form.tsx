@@ -74,36 +74,29 @@ export default function AvailabilityForm({ initialData, user }: AvailabilityForm
   const router = useRouter();
   const [activeClubId, setActiveClubId] = useState(initialData?.activeClubId || '');
   const [view, setView] = useState<'summary' | 'edit'>('edit');
+  const [canEditCurrentPostulation, setCanEditCurrentPostulation] = useState(true);
   
   const activeClubData = useMemo(() => {
     return activeClubId ? initialData?.clubs[activeClubId] : undefined;
   }, [activeClubId, initialData]);
-
-  const canEditCurrentPostulation = useMemo(() => {
-    return activeClubData?.postulation ? isPostulationEditable(
-      activeClubData.postulation.selectedMatches,
-      activeClubData.assignments
-    ) : true;
+  
+  useEffect(() => {
+    if (activeClubData?.postulation) {
+        setView('summary');
+        const isEditable = isPostulationEditable(
+            activeClubData.postulation.selectedMatches,
+            activeClubData.assignments
+        );
+        setCanEditCurrentPostulation(isEditable);
+    } else {
+        setView('edit');
+        setCanEditCurrentPostulation(true);
+    }
   }, [activeClubData]);
   
   const handleClubChange = useCallback((newClubId: string) => {
     setActiveClubId(newClubId);
-    const clubData = initialData?.clubs[newClubId];
-    if (clubData?.postulation) {
-      setView('summary');
-    } else {
-      setView('edit');
-    }
-  }, [initialData]);
-
-  // Set initial view based on whether there's a postulation for the active club
-  useEffect(() => {
-    if (activeClubData?.postulation) {
-      setView('summary');
-    } else {
-      setView('edit');
-    }
-  }, [activeClubData]);
+  }, []);
   
   if (!initialData) {
     return (
