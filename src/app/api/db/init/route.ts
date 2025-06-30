@@ -88,15 +88,11 @@ const schemaCreationCommands = [
 
 export async function GET() {
   try {
-    console.log('Reiniciando la base de datos... Borrando tablas existentes.');
-    for (const command of schemaDestructionCommands) {
-      await db.execute(command);
-    }
+    console.log('Reiniciando la base de datos... Enviando comandos de borrado en lote.');
+    await db.batch(schemaDestructionCommands, 'write');
     
-    console.log('Creando nuevo esquema de base de datos...');
-    for (const command of schemaCreationCommands) {
-      await db.execute(command);
-    }
+    console.log('Creando nuevo esquema de base de datos... Enviando comandos de creación en lote.');
+    await db.batch(schemaCreationCommands, 'write');
 
     console.log('La base de datos se ha inicializado correctamente.');
     return NextResponse.json({ message: 'La base de datos se ha reiniciado y actualizado correctamente.' });
