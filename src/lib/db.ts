@@ -1,6 +1,5 @@
 
 import { createClient, type Client } from '@libsql/client';
-import 'dotenv/config';
 
 // Declare a global variable to hold the database client in development
 declare global {
@@ -16,39 +15,30 @@ if (process.env.NODE_ENV === 'production') {
   const url = process.env.TURSO_DATABASE_URL;
   const authToken = process.env.TURSO_AUTH_TOKEN;
 
-  if (!url || url.includes('<')) {
-    throw new Error('FATAL: TURSO_DATABASE_URL environment variable is not defined or is a placeholder for production.');
+  if (!url) {
+    throw new Error('FATAL: TURSO_DATABASE_URL environment variable is not defined for production.');
   }
-  if (!authToken || authToken.includes('<')) {
-    throw new Error('FATAL: TURSO_AUTH_TOKEN environment variable is not defined or is a placeholder for production.');
+  if (!authToken) {
+    throw new Error('FATAL: TURSO_AUTH_TOKEN environment variable is not defined for production.');
   }
   
   db = createClient({ url, authToken });
-  console.log('✅ Connected to Turso database in production.');
+  console.log('✅ Production: Turso database client configured.');
 
 } else {
-  // For local development, we use a singleton pattern to prevent multiple
-  // connections during hot-reloading. It will try to use Turso if env vars
-  // are present, otherwise it will fall back to a local file.
+  // In development, use a global variable to preserve the client
+  // across module reloads caused by HMR (Hot Module Replacement).
   if (!global.db) {
     const url = process.env.TURSO_DATABASE_URL;
     const authToken = process.env.TURSO_AUTH_TOKEN;
 
-    if (url && authToken) {
-      // Check for placeholder values to prevent crashes
-      if (url.includes('<') || authToken.includes('<')) {
-        console.warn('⚠️ WARNING: Placeholder values detected for Turso in your .env file.');
-        console.warn('Falling back to local database file (arbitros.db).');
-        console.warn('To connect to Turso locally, provide real credentials in .env. To use the local DB, remove or comment out the TURSO variables.');
-        global.db = createClient({ url: 'file:arbitros.db' });
-        console.log('✅ Connected to local database: arbitros.db');
-      } else {
+    // Check for placeholder values to prevent crashes
+    if (url && !url.includes('<') && authToken && !authToken.includes('<')) {
+        console.log('✅ Development: Connecting to Turso database.');
         global.db = createClient({ url, authToken });
-        console.log('✅ Connected to Turso database in development.');
-      }
     } else {
-      global.db = createClient({ url: 'file:arbitros.db' });
-      console.log('✅ Connected to local database: arbitros.db');
+        console.log('✅ Development: Turso env vars not found or are placeholders. Falling back to local file: arbitros.db');
+        global.db = createClient({ url: 'file:arbitros.db' });
     }
   }
   db = global.db;
