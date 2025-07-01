@@ -1,3 +1,4 @@
+
 import { createClient, type Client } from '@libsql/client';
 import 'dotenv/config';
 
@@ -35,7 +36,7 @@ if (process.env.NODE_ENV === 'production') {
 
     if (url && authToken) {
       // Check for placeholder values to prevent crashes
-      if (url.includes('tu_url_de_turso') || authToken.includes('tu_token_de_turso')) {
+      if (url.includes('<') || authToken.includes('<')) {
         console.warn('⚠️ WARNING: Placeholder values detected for Turso in your .env file.');
         console.warn('Falling back to local database file (arbitros.db).');
         console.warn('To connect to Turso locally, provide real credentials in .env. To use the local DB, remove or comment out the TURSO variables.');
