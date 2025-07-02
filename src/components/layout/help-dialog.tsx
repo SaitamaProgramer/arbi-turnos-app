@@ -13,14 +13,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { HelpCircle, User, Shield } from "lucide-react";
 
-export function HelpDialog() {
+export function HelpDialog({ children }: { children?: React.ReactNode }) {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="sm" className="text-foreground hover:text-primary">
-          <HelpCircle size={18} className="mr-1 sm:mr-2" />
-          <span className="hidden sm:inline">Ayuda</span>
-        </Button>
+        {children || (
+          <Button variant="ghost" size="sm" className="text-foreground hover:text-primary">
+            <HelpCircle size={18} className="mr-1 sm:mr-2" />
+            <span className="hidden sm:inline">Ayuda</span>
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent className="sm:max-w-[625px]">
         <DialogHeader>

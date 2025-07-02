@@ -47,7 +47,7 @@ export async function registerUser(payload: RegisterUserPayload) {
         return { error: 'Datos de registro inválidos.' };
     }
     const { name, email, password, role, clubName, clubIdToJoin } = validation.data;
-    const newUserId = `user_${randomBytes(16).toString('hex')}`;
+    const newUserId = `user_${randomBytes(8).toString('hex')}`;
     let userRoleForRedirect: 'admin' | 'referee';
 
     try {
@@ -66,7 +66,7 @@ export async function registerUser(payload: RegisterUserPayload) {
             if (role === 'admin') {
                 if (!clubName) throw new Error('El nombre de la asociación es requerido para administradores.');
                 userRoleForRedirect = 'admin';
-                const newClubId = `club_${randomBytes(16).toString('hex')}`;
+                const newClubId = `club_${randomBytes(4).toString('hex')}`;
 
                 await tx.execute({
                     sql: 'INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)',
@@ -436,7 +436,7 @@ export async function submitAvailability(payload: z.infer<typeof availabilitySch
             return { error: "Ya tienes una postulación pendiente para esta asociación. Por favor, edítala." };
         }
 
-        const requestId = `req_${randomBytes(16).toString('hex')}`;
+        const requestId = `req_${randomBytes(8).toString('hex')}`;
         const submittedAt = new Date().toISOString();
 
         const tx = await db.transaction('write');
@@ -623,7 +623,7 @@ export async function submitSuggestion(suggestionText: string) {
     try {
         const user = await getUserFromSession();
         
-        const newSuggestionId = `sug_${randomBytes(16).toString('hex')}`;
+        const newSuggestionId = `sug_${randomBytes(8).toString('hex')}`;
         const submittedAt = new Date().toISOString();
         const userId = user?.id ?? null;
         const userName = user?.name ?? 'Anónimo';

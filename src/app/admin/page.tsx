@@ -110,9 +110,9 @@ export default async function AdminPage() {
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <p><strong>Nombre de la Asociación:</strong> {club.name}</p>
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <strong>Código de la Asociación:</strong> 
-                    <span className="font-mono bg-muted px-2 py-1 rounded text-sm">{club.id}</span>
+                    <span className="font-mono bg-muted px-2 py-1 rounded text-sm break-all">{club.id}</span>
                     <CopyClubIdButton clubId={club.id} />
                   </div>
                   <p className="text-sm text-muted-foreground">

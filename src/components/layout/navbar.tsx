@@ -5,13 +5,14 @@ import { getUserFromSession } from '@/lib/session';
 import { Button } from '@/components/ui/button';
 import { logout } from '@/lib/actions';
 import { HelpDialog } from './help-dialog';
+import { MobileNav } from './mobile-nav';
 
 async function LogoutButton() {
   return (
     <form action={logout}>
       <Button variant="ghost" size="sm" type="submit" className="text-foreground hover:text-primary">
           <LogOut size={18} className="mr-1 sm:mr-2" />
-          Salir
+          <span className="hidden sm:inline">Salir</span>
       </Button>
     </form>
   )
@@ -27,7 +28,9 @@ export default async function Navbar() {
           <UsersRound size={28} strokeWidth={2.5} />
           <h1 className="text-2xl font-bold">ArbiTurnos</h1>
         </Link>
-        <div className="space-x-1 sm:space-x-2 flex items-center">
+        
+        {/* Desktop Navigation */}
+        <div className="hidden md:flex space-x-1 sm:space-x-2 items-center">
           {currentUser && currentUser.role !== 'admin' && (
             <Link href="/" className="text-foreground hover:text-primary transition-colors font-medium text-sm sm:text-base">
               Disponibilidad
@@ -65,6 +68,9 @@ export default async function Navbar() {
             </>
           )}
         </div>
+
+        {/* Mobile Navigation */}
+        <MobileNav currentUser={currentUser} />
       </nav>
     </header>
   );
