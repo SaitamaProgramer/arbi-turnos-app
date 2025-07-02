@@ -1,4 +1,3 @@
-
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -17,13 +16,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
+import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { saveClubDefinedMatches } from "@/lib/actions";
 import type { ClubSpecificMatch } from "@/types";
 import { useState, useTransition, useEffect } from "react";
-import { Save, ListPlus, Trash2, Loader2, CalendarPlusIcon, CalendarIcon, ClockIcon, MapPinIcon, InfoIcon } from "lucide-react";
+import { Save, ListPlus, Trash2, Loader2, CalendarPlusIcon, CalendarIcon, ClockIcon, MapPinIcon, InfoIcon, CopyPlus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO, formatISO, isBefore, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
@@ -122,6 +122,25 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
       status: "scheduled",
     }, { shouldFocus: true });
   };
+  
+  const reuseMatch = (index: number) => {
+    const matchToClone = form.getValues().matches[index];
+    if (!matchToClone) return;
+
+    append({
+        id: `match_${crypto.randomUUID().substring(0, 8)}`,
+        description: matchToClone.description,
+        location: matchToClone.location,
+        date: new Date(), // Reset to today
+        time: "12:00", // Reset to a default time
+        status: "scheduled", // Reset status
+    }, { shouldFocus: true });
+    
+    toast({
+        title: "Partido Reutilizado",
+        description: "Se ha creado un borrador. Por favor, ajusta la fecha y la hora."
+    });
+  };
 
 
   return (
@@ -133,7 +152,7 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
         </CardTitle>
         <CardDescription>
           Crea, edita o elimina los partidos. Puedes marcar un partido como cancelado o pospuesto. 
-          Los partidos pasados no se pueden editar.
+          Los partidos pasados pueden ser reutilizados para crear nuevos rápidamente.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -147,11 +166,25 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
                 const isEditable = !isPast;
                 
                 return (
-                  <Card key={field.id} className={cn("p-4 space-y-3 bg-muted/30 relative", !isEditable && "opacity-70")}>
-                    {!isEditable && <div className="absolute inset-0 bg-transparent z-10" title="Este partido ya pasó y no se puede editar."></div>}
+                  <Card key={field.id} className={cn("p-4 space-y-3 bg-muted/30 relative", isPast && "opacity-70")}>
                     <div className="flex justify-between items-start mb-2 gap-2">
-                        <FormLabel className="text-lg font-semibold pt-1.5">Partido {index + 1}</FormLabel>
+                        <FormLabel className="text-lg font-semibold pt-1.5 flex items-center gap-2">
+                          Partido {index + 1}
+                          {isPast && <Badge variant="outline" className="border-muted-foreground text-muted-foreground font-normal text-xs">Pasado</Badge>}
+                        </FormLabel>
                         <div className="flex items-center gap-2">
+                          {isPast && (
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="h-8"
+                                onClick={() => reuseMatch(index)}
+                            >
+                                <CopyPlus size={14} className="mr-1" />
+                                Reutilizar
+                            </Button>
+                          )}
                           <FormField
                             control={form.control}
                             name={`matches.${index}.status`}

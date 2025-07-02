@@ -6,7 +6,7 @@ import {
 import { getUserFromSession } from "@/lib/session";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClipboardList, ShieldAlert, Info, LayoutDashboard, CalendarPlus, MessageSquare } from "lucide-react";
+import { ClipboardList, ShieldAlert, Info, LayoutDashboard, CalendarPlus, MessageSquare, Users } from "lucide-react";
 import { redirect } from "next/navigation";
 import ShiftTable from "@/components/admin/shift-table";
 import ClubMatchManager from "@/components/admin/form-config-editor";
@@ -14,6 +14,7 @@ import AdminDashboard from "@/components/admin/admin-dashboard";
 import CopyClubIdButton from "@/components/admin/copy-club-id-button";
 import type { Metadata } from 'next';
 import SuggestionsView from "@/components/admin/suggestions-view";
+import MembersManager from "@/components/admin/members-manager";
 
 export const metadata: Metadata = {
   title: 'Panel de Administración',
@@ -27,7 +28,8 @@ export default async function AdminPage() {
   if (!user) {
     redirect('/login');
   }
-  if (user.role !== 'admin' || !user.administeredClubIds || user.administeredClubIds.length === 0) {
+  // Check if the user has admin rights for any club
+  if (!user.isAdmin || !user.administeredClubIds || user.administeredClubIds.length === 0) {
      redirect('/');
   }
 
@@ -51,7 +53,8 @@ export default async function AdminPage() {
    );
   }
 
-  const { club, referees, shiftRequests, definedMatches, matchAssignments } = adminData;
+  const { club, clubMembers, shiftRequests, definedMatches, matchAssignments } = adminData;
+  const refereesInClub = clubMembers.filter(m => m.roleInClub === 'referee');
 
   return (
     <div className="w-full space-y-6">
@@ -66,7 +69,7 @@ export default async function AdminPage() {
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="dashboard" className="w-full relative">
-            <TabsList className="grid w-full grid-cols-1 md:grid-cols-2 lg:grid-cols-5 mb-24 md:mb-8 relative z-10 [transform:translateZ(0px)]">
+            <TabsList className="grid w-full grid-cols-1 md:grid-cols-3 lg:grid-cols-6 mb-24 md:mb-8 relative z-10 [transform:translateZ(0px)]">
                <TabsTrigger value="dashboard">
                 <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
               </TabsTrigger>
@@ -75,6 +78,9 @@ export default async function AdminPage() {
               </TabsTrigger>
               <TabsTrigger value="match-manager"> 
                 <CalendarPlus className="mr-2 h-4 w-4" /> Definir Partidos/Turnos
+              </TabsTrigger>
+              <TabsTrigger value="members">
+                <Users className="mr-2 h-4 w-4" /> Gestionar Miembros
               </TabsTrigger>
                <TabsTrigger value="club-info">
                 <Info className="mr-2 h-4 w-4" /> Info de la Asociación
@@ -88,7 +94,7 @@ export default async function AdminPage() {
              <TabsContent value="dashboard" className="relative z-0">
               <AdminDashboard 
                 shiftRequestsForClub={shiftRequests}
-                allRefereesInClub={referees}
+                allRefereesInClub={refereesInClub}
               />
             </TabsContent>
             <TabsContent value="assignments" className="relative z-0"> 
@@ -96,12 +102,19 @@ export default async function AdminPage() {
                 clubId={club.id}
                 initialDefinedMatches={definedMatches}
                 initialShiftRequests={shiftRequests}
-                initialClubReferees={referees}
+                initialClubMembers={clubMembers}
                 initialMatchAssignments={matchAssignments}
               />
             </TabsContent>
             <TabsContent value="match-manager" className="relative z-0"> 
               <ClubMatchManager clubId={club.id} initialMatches={definedMatches} />
+            </TabsContent>
+            <TabsContent value="members" className="relative z-0">
+                <MembersManager 
+                    clubId={club.id}
+                    members={clubMembers}
+                    currentUserId={user.id}
+                />
             </TabsContent>
             <TabsContent value="club-info" className="relative z-0">
               <Card>

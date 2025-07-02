@@ -1,5 +1,6 @@
+
 import Link from 'next/link';
-import { UsersRound, LogIn, UserPlus, LogOut, ShieldCheck, UserCog } from 'lucide-react';
+import { UsersRound, LogIn, UserPlus, LogOut, ShieldCheck, UserCog, CalendarCheck } from 'lucide-react';
 import { getUserFromSession } from '@/lib/session';
 import { Button } from '@/components/ui/button';
 import { logout } from '@/lib/actions';
@@ -30,13 +31,14 @@ export default async function Navbar() {
         
         {/* Desktop Navigation */}
         <div className="hidden lg:flex space-x-1 sm:space-x-2 items-center">
-          {currentUser && currentUser.role !== 'admin' && (
-            <Link href="/" className="text-foreground hover:text-primary transition-colors font-medium text-sm sm:text-base">
+          {currentUser && (
+            <Link href="/" className="text-foreground hover:text-primary transition-colors font-medium text-sm sm:text-base inline-flex items-center">
+              <CalendarCheck size={18} className="mr-1 sm:mr-2" />
               Disponibilidad
             </Link>
           )}
           
-          {currentUser?.role === 'admin' && (
+          {currentUser?.isAdmin && (
             <Link href="/admin" className="text-foreground hover:text-primary transition-colors font-medium text-sm sm:text-base inline-flex items-center">
               <ShieldCheck size={18} className="mr-1 sm:mr-2" />
               Administración

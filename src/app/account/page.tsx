@@ -25,6 +25,10 @@ export default async function AccountPage() {
         redirect('/login');
     }
 
+    const roles = [];
+    if (user.isAdmin) roles.push('Administrador');
+    if (user.isReferee) roles.push('Árbitro');
+
     return (
         <div className="space-y-8">
             <Card className="w-full mx-auto shadow-xl">
@@ -43,13 +47,13 @@ export default async function AccountPage() {
                         <div className="space-y-2 text-sm">
                             <p className="flex items-center gap-2"><UserIcon className="h-4 w-4 text-muted-foreground" /> <strong>Nombre:</strong> {user.name}</p>
                             <p className="flex items-center gap-2"><Mail className="h-4 w-4 text-muted-foreground" /> <strong>Email:</strong> {user.email}</p>
-                            <p className="flex items-center gap-2"><Shield className="h-4 w-4 text-muted-foreground" /> <strong>Rol:</strong> <span className="capitalize">{user.role === 'admin' ? 'Administrador' : 'Árbitro'}</span></p>
+                            <p className="flex items-center gap-2"><Shield className="h-4 w-4 text-muted-foreground" /> <strong>Roles:</strong> <span className="capitalize">{roles.join(', ')}</span></p>
                         </div>
                     </div>
                 </CardContent>
             </Card>
 
-            {user.role === 'referee' && stats && <UserStats stats={stats} />}
+            {user.isReferee && stats && <UserStats stats={stats} />}
             
             <Card className="w-full mx-auto shadow-xl">
                 <CardHeader>

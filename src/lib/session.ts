@@ -79,7 +79,7 @@ export async function getUserFromSession(): Promise<User | null> {
 export async function getFullUserFromDb(userId: string): Promise<User | null> {
      try {
         const userResult = await db.execute({
-            sql: 'SELECT id, name, email, role FROM users WHERE id = ?',
+            sql: 'SELECT id, name, email FROM users WHERE id = ?',
             args: [userId]
         });
         
@@ -94,17 +94,23 @@ export async function getFullUserFromDb(userId: string): Promise<User | null> {
         
         user.memberClubIds = [];
         user.administeredClubIds = [];
+        user.isAdmin = false;
+        user.isReferee = false;
 
         for (const row of membershipsResult.rows) {
             const membership = rowsToType<{clubId: string, roleInClub: 'admin' | 'referee'}>([row])[0];
             user.memberClubIds.push(membership.clubId);
             if (membership.roleInClub === 'admin') {
                 user.administeredClubIds.push(membership.clubId);
+                user.isAdmin = true;
+            }
+            if (membership.roleInClub === 'referee') {
+                user.isReferee = true;
             }
         }
 
         // Add the isDeveloper flag based on the environment variable
-        if (user.role === 'admin' && process.env.DEVELOPER_EMAIL) {
+        if (user.isAdmin && process.env.DEVELOPER_EMAIL) {
             user.isDeveloper = user.email === process.env.DEVELOPER_EMAIL;
         }
 

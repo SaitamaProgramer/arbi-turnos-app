@@ -48,7 +48,6 @@ export async function registerUser(payload: RegisterUserPayload) {
     }
     const { name, email, password, role, clubName, clubIdToJoin } = validation.data;
     const newUserId = `user_${randomBytes(8).toString('hex')}`;
-    let userRoleForRedirect: 'admin' | 'referee';
 
     try {
         const existingUserResult = await db.execute({
@@ -63,36 +62,36 @@ export async function registerUser(payload: RegisterUserPayload) {
         
         const tx = await db.transaction('write');
         try {
+            await tx.execute({
+                sql: 'INSERT INTO users (id, name, email, password) VALUES (?, ?, ?, ?)',
+                args: [newUserId, name, email, hashedPassword]
+            });
+
             if (role === 'admin') {
                 if (!clubName) throw new Error('El nombre de la asociación es requerido para administradores.');
-                userRoleForRedirect = 'admin';
                 const newClubId = `club_${randomBytes(4).toString('hex')}`;
-
-                await tx.execute({
-                    sql: 'INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)',
-                    args: [newUserId, name, email, hashedPassword, role]
-                });
+                
                 await tx.execute({
                     sql: 'INSERT INTO clubs (id, name) VALUES (?, ?)',
                     args: [newClubId, clubName]
                 });
+                // Add user as both admin and referee for the new club
                 await tx.execute({
                     sql: 'INSERT INTO user_clubs_membership (user_id, club_id, role_in_club) VALUES (?, ?, ?)',
                     args: [newUserId, newClubId, 'admin']
                 });
+                await tx.execute({
+                    sql: 'INSERT INTO user_clubs_membership (user_id, club_id, role_in_club) VALUES (?, ?, ?)',
+                    args: [newUserId, newClubId, 'referee']
+                });
 
             } else { // role === 'referee'
                 if (!clubIdToJoin) throw new Error('El código de asociación es requerido para árbitros.');
-                userRoleForRedirect = 'referee';
                 const clubResult = await tx.execute({ sql: 'SELECT id FROM clubs WHERE id = ?', args: [clubIdToJoin] });
                 if (clubResult.rows.length === 0) {
                     throw new Error('El código de asociación no es válido.');
                 }
                 
-                await tx.execute({
-                    sql: 'INSERT INTO users (id, name, email, password, role) VALUES (?, ?, ?, ?, ?)',
-                    args: [newUserId, name, email, hashedPassword, role]
-                });
                 await tx.execute({
                     sql: 'INSERT INTO user_clubs_membership (user_id, club_id, role_in_club) VALUES (?, ?, ?)',
                     args: [newUserId, clubIdToJoin, 'referee']
@@ -111,7 +110,8 @@ export async function registerUser(payload: RegisterUserPayload) {
         return { error: `Ocurrió un error en el servidor: ${e.message}` };
     }
 
-    const destination = userRoleForRedirect === 'admin' ? '/admin' : '/';
+    const user = await getFullUserFromDb(newUserId);
+    const destination = user?.isAdmin ? '/admin' : '/';
     return { success: true, redirectUrl: destination };
 }
 
@@ -127,11 +127,11 @@ export async function login(payload: z.infer<typeof loginSchema>) {
         return { error: 'Datos de inicio de sesión inválidos.' };
     }
     const { email, password } = validation.data;
-    let userFromDb: User;
+    let userFromDb: User | null;
 
     try {
         const result = await db.execute({
-            sql: 'SELECT id, password, role FROM users WHERE email = ?',
+            sql: 'SELECT id, password FROM users WHERE email = ?',
             args: [email]
         });
         
@@ -139,21 +139,26 @@ export async function login(payload: z.infer<typeof loginSchema>) {
             return { error: 'Correo electrónico o contraseña incorrectos.' };
         }
         
-        userFromDb = rowsToType<User>(result.rows)[0];
+        const rawUser = rowsToType<User>(result.rows)[0];
 
-        const passwordMatch = await verifyPassword(password, userFromDb.password as string);
+        const passwordMatch = await verifyPassword(password, rawUser.password as string);
         if (!passwordMatch) {
             return { error: 'Correo electrónico o contraseña incorrectos.' };
         }
         
-        await createSession(userFromDb.id);
+        await createSession(rawUser.id);
+        userFromDb = await getFullUserFromDb(rawUser.id);
         
     } catch (e: any) {
         console.error("Error en login:", e.message);
         return { error: `Ocurrió un error en el servidor: ${e.message}` };
     }
+
+    if (!userFromDb) {
+        return { error: 'No se pudo cargar la información del usuario después del inicio de sesión.' };
+    }
     
-    const redirectUrl = userFromDb.role === 'admin' ? '/admin' : '/';
+    const redirectUrl = userFromDb.isAdmin ? '/admin' : '/';
     return { success: true, redirectUrl };
 }
 
@@ -167,7 +172,8 @@ export async function getAdminPageData(clubId: string) {
         // Run queries in parallel for better performance
         const [
             clubResult,
-            refereesResult,
+            usersInClubResult,
+            clubMembershipsResult,
             shiftRequestsRawResult,
             definedMatchesResult,
             matchAssignmentsResult,
@@ -175,11 +181,15 @@ export async function getAdminPageData(clubId: string) {
             db.execute({ sql: 'SELECT * FROM clubs WHERE id = ?', args: [clubId] }),
             db.execute({
                 sql: `
-                    SELECT u.id, u.name, u.email, u.role
-                    FROM users u
-                    JOIN user_clubs_membership ucm ON u.id = ucm.user_id
-                    WHERE ucm.club_id = ? AND u.role = 'referee'
+                    SELECT u.id, u.name, u.email 
+                    FROM users u 
+                    JOIN (SELECT DISTINCT user_id FROM user_clubs_membership WHERE club_id = ?) as members ON u.id = members.user_id
+                    ORDER BY u.name ASC
                 `,
+                args: [clubId]
+            }),
+            db.execute({
+                sql: `SELECT user_id, role_in_club FROM user_clubs_membership WHERE club_id = ?`,
                 args: [clubId]
             }),
             db.execute({
@@ -206,7 +216,27 @@ export async function getAdminPageData(clubId: string) {
         const club = rowsToType<Club>(clubResult.rows)[0];
         if (!club) return null;
 
-        const referees = rowsToType<User>(refereesResult.rows);
+        // Process members and their roles robustly
+        const usersInClub = rowsToType<User>(usersInClubResult.rows);
+        const memberships = rowsToType<{ userId: string, roleInClub: 'admin' | 'referee' }>(clubMembershipsResult.rows);
+
+        const membershipsByUserId = new Map<string, Array<'admin' | 'referee'>>();
+        for (const membership of memberships) {
+            if (!membershipsByUserId.has(membership.userId)) {
+                membershipsByUserId.set(membership.userId, []);
+            }
+            membershipsByUserId.get(membership.userId)!.push(membership.roleInClub);
+        }
+
+        const clubMembers: User[] = usersInClub.map(user => {
+            const roles = membershipsByUserId.get(user.id) || [];
+            const primaryRole: 'admin' | 'referee' = roles.includes('admin') ? 'admin' : 'referee';
+            return {
+                ...user,
+                roleInClub: primaryRole,
+            };
+        });
+
         const shiftRequestsRaw = shiftRequestsRawResult.rows;
         const definedMatches = rowsToType<ClubSpecificMatch>(definedMatchesResult.rows);
         const matchAssignments = rowsToType<MatchAssignment>(matchAssignmentsResult.rows);
@@ -248,7 +278,7 @@ export async function getAdminPageData(clubId: string) {
 
         return {
             club,
-            referees,
+            clubMembers,
             shiftRequests,
             definedMatches,
             matchAssignments,
@@ -281,7 +311,7 @@ export async function getSuggestions(): Promise<Suggestion[]> {
 
 export async function saveClubDefinedMatches(clubId: string, matches: Omit<ClubSpecificMatch, 'clubId'>[]) {
     const user = await getUserFromSession();
-    if (!user || user.role !== 'admin' || !user.administeredClubIds?.includes(clubId)) {
+    if (!user || !user.isAdmin || !user.administeredClubIds?.includes(clubId)) {
         return { success: false, error: 'No tienes permiso para realizar esta acción.' };
     }
     
@@ -333,7 +363,9 @@ export async function getAvailabilityFormData(userId: string) {
             sql: 'SELECT club_id FROM user_clubs_membership WHERE user_id = ?',
             args: [userId]
         });
-        const memberClubIds = memberClubIdsResult.rows.map(r => r.club_id as string);
+        // Use a Set to handle cases where a user has multiple roles in the same club
+        const memberClubIds = [...new Set(memberClubIdsResult.rows.map(r => r.club_id as string))];
+
         if (memberClubIds.length === 0) return null;
 
         const clubsResult = await db.execute({
@@ -547,7 +579,7 @@ export async function updateAvailability(requestId: string, payload: z.infer<typ
 
 export async function assignRefereeToMatch(clubId: string, matchId: string, refereeId: string) {
     const user = await getUserFromSession();
-    if (!user || user.role !== 'admin' || !user.administeredClubIds?.includes(clubId)) {
+    if (!user || !user.isAdmin || !user.administeredClubIds?.includes(clubId)) {
         return { success: false, error: 'No tienes permiso para realizar esta acción.' };
     }
 
@@ -600,7 +632,7 @@ export async function assignRefereeToMatch(clubId: string, matchId: string, refe
 
 export async function unassignRefereeFromMatch(clubId: string, matchId: string) {
     const user = await getUserFromSession();
-    if (!user || user.role !== 'admin' || !user.administeredClubIds?.includes(clubId)) {
+    if (!user || !user.isAdmin || !user.administeredClubIds?.includes(clubId)) {
         return { success: false, error: 'No tienes permiso para realizar esta acción.' };
     }
     try {
@@ -646,8 +678,8 @@ export async function submitSuggestion(suggestionText: string) {
 
 export async function joinAnotherClub(clubIdToJoin: string) {
     const user = await getUserFromSession();
-    if (!user || user.role !== 'referee') {
-        return { success: false, error: 'Solo los árbitros pueden unirse a asociaciones.' };
+    if (!user) {
+        return { success: false, error: 'Debes iniciar sesión para unirte a una asociación.' };
     }
     const userId = user.id;
 
@@ -666,8 +698,8 @@ export async function joinAnotherClub(clubIdToJoin: string) {
             }
 
             const membershipResult = await tx.execute({
-                sql: 'SELECT user_id FROM user_clubs_membership WHERE user_id = ? AND club_id = ?',
-                args: [userId, clubIdToJoinTrimmed]
+                sql: 'SELECT user_id FROM user_clubs_membership WHERE user_id = ? AND club_id = ? AND role_in_club = ?',
+                args: [userId, clubIdToJoinTrimmed, 'referee']
             });
 
             if (membershipResult.rows.length > 0) {
@@ -750,7 +782,7 @@ export async function getAccountPageData(userId: string): Promise<{ user: User, 
 
     try {
         const associationsPromise = db.execute({
-            sql: `SELECT COUNT(club_id) as count FROM user_clubs_membership WHERE user_id = ?`,
+            sql: `SELECT COUNT(DISTINCT club_id) as count FROM user_clubs_membership WHERE user_id = ?`,
             args: [userId]
         });
 
@@ -808,3 +840,57 @@ export async function getAccountPageData(userId: string): Promise<{ user: User, 
         return { user, stats: { associationsCount: 0, refereedMatchesCount: 0, cancelledMatchesCount: 0, postulationsCount: 0 }};
     }
 }
+
+export async function promoteUserToAdmin(clubId: string, userIdToPromote: string) {
+    const user = await getUserFromSession();
+    if (!user || !user.isAdmin || !user.administeredClubIds?.includes(clubId)) {
+        return { success: false, error: "No tienes permiso para realizar esta acción." };
+    }
+
+    try {
+        // Use ON CONFLICT DO NOTHING to make the operation idempotent.
+        // If the user already has the 'admin' role, this will do nothing and not throw an error.
+        await db.execute({
+            sql: `INSERT INTO user_clubs_membership (user_id, club_id, role_in_club) VALUES (?, ?, 'admin') ON CONFLICT(user_id, club_id, role_in_club) DO NOTHING`,
+            args: [userIdToPromote, clubId]
+        });
+        return { success: true };
+    } catch (e: any) {
+        console.error(`Error promoting user:`, e.message);
+        return { success: false, error: "No se pudo promover al miembro. Ocurrió un error en la base de datos." };
+    }
+}
+
+export async function demoteAdminToReferee(clubId: string, userIdToDemote: string) {
+    const user = await getUserFromSession();
+    if (!user) return { success: false, error: "Debes iniciar sesión." };
+    
+    if (!user.isAdmin || !user.administeredClubIds?.includes(clubId)) {
+        return { success: false, error: "No tienes permiso para realizar esta acción." };
+    }
+
+    if (user.id === userIdToDemote) {
+        const adminsResult = await db.execute({
+            sql: `SELECT COUNT(user_id) as count FROM user_clubs_membership WHERE club_id = ? AND role_in_club = 'admin'`,
+            args: [clubId]
+        });
+        const adminCount = Number(adminsResult.rows[0]?.count ?? 0);
+        if (adminCount <= 1) {
+            return { success: false, error: "No puedes revocar tu propio rol si eres el último administrador." };
+        }
+    }
+
+    try {
+        // This only removes the admin role, leaving other roles (like referee) intact.
+        await db.execute({
+            sql: `DELETE FROM user_clubs_membership WHERE user_id = ? AND club_id = ? AND role_in_club = 'admin'`,
+            args: [userIdToDemote, clubId]
+        });
+        return { success: true };
+    } catch (e: any) {
+        console.error(`Error demoting admin:`, e.message);
+        return { success: false, error: "No se pudo actualizar el rol del miembro." };
+    }
+}
+
+    

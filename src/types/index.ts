@@ -33,14 +33,17 @@ export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'referee';
   administeredClubIds?: string[];
   memberClubIds?: string[]; 
   password?: string; // Should only be present when creating/checking, not on fetched user objects
   isDeveloper?: boolean; // Flag to identify the developer user
+  roleInClub?: 'admin' | 'referee'; // Role of the user within a specific club context
+  isAdmin?: boolean;
+  isReferee?: boolean;
 }
 
 export type RegisterUserPayload = Omit<User, 'id'> & {
+  role: 'admin' | 'referee'; // This is needed for the form, but not stored globally
   confirmPassword?: string;
   clubName?: string;
   clubIdToJoin?: string;

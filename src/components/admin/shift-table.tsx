@@ -40,7 +40,7 @@ interface ShiftTableProps {
   clubId: string; 
   initialDefinedMatches: ClubSpecificMatch[];
   initialShiftRequests: ShiftRequestWithMatches[];
-  initialClubReferees: User[]; 
+  initialClubMembers: User[]; 
   initialMatchAssignments: MatchAssignment[]; 
 }
 
@@ -65,7 +65,7 @@ export default function ShiftTable({
   clubId, 
   initialDefinedMatches,
   initialShiftRequests,
-  initialClubReferees,
+  initialClubMembers,
   initialMatchAssignments
 }: ShiftTableProps) {
   const { toast } = useToast();
@@ -99,7 +99,7 @@ export default function ShiftTable({
 
   }, [initialDefinedMatches, initialShiftRequests, initialMatchAssignments]);
   
-  const getRefereeNameById = (userId: string) => initialClubReferees.find(u => u.id === userId)?.name || 'Desconocido';
+  const getMemberNameById = (userId: string) => initialClubMembers.find(u => u.id === userId)?.name || 'Desconocido';
 
   const postulatedRefereesByMatchId = useMemo(() => {
     const map = new Map<string, PostulatedRefereeDetails[]>();
@@ -107,7 +107,7 @@ export default function ShiftTable({
         const postulated = [];
         for (const request of shiftRequests) {
             if (request.selectedMatches.some(sm => sm.id === match.id)) {
-                const user = initialClubReferees.find(u => u.id === request.userId);
+                const user = initialClubMembers.find(u => u.id === request.userId);
                 if (user) {
                     postulated.push({
                         user,
@@ -120,7 +120,7 @@ export default function ShiftTable({
         map.set(match.id, postulated);
     }
     return map;
-  }, [definedMatches, shiftRequests, initialClubReferees]);
+  }, [definedMatches, shiftRequests, initialClubMembers]);
 
   const openAssignDialog = (match: ClubSpecificMatch) => {
     const currentAssignment = assignments.find(a => a.matchId === match.id);
@@ -143,7 +143,7 @@ export default function ShiftTable({
         if (result.success) {
           toast({
             title: "Árbitro Asignado",
-            description: `${getRefereeNameById(selectedRefereeId) || selectedRefereeId} ha sido asignado.`,
+            description: `${getMemberNameById(selectedRefereeId) || selectedRefereeId} ha sido asignado.`,
             variant: 'success'
           });
           router.refresh(); 
@@ -206,7 +206,7 @@ export default function ShiftTable({
           {definedMatches.map((match) => {
             const postulatedRefereeDetails = postulatedRefereesByMatchId.get(match.id) || [];
             const assignment = assignments.find(a => a.matchId === match.id);
-            const assignedRefereeName = assignment ? getRefereeNameById(assignment.assignedRefereeId) : null;
+            const assignedRefereeName = assignment ? getMemberNameById(assignment.assignedRefereeId) : null;
             const isPast = pastMatchIds.has(match.id);
             const isActionsDisabled = isPast || match.status === 'cancelled' || match.status === 'postponed';
 
