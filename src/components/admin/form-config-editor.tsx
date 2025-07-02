@@ -160,7 +160,7 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
                                 <Select onValueChange={inputField.onChange} defaultValue={inputField.value} disabled={!isEditable}>
                                   <FormControl>
                                     <SelectTrigger className={cn(
-                                        "w-[150px] text-xs h-8",
+                                        "text-xs h-8",
                                         inputField.value === 'scheduled' && "bg-blue-100 border-blue-300 text-blue-800",
                                         inputField.value === 'cancelled' && "bg-red-100 border-red-300 text-red-800",
                                         inputField.value === 'postponed' && "bg-yellow-100 border-yellow-300 text-yellow-800"

@@ -79,7 +79,7 @@ export function MobileNav({ currentUser }: MobileNavProps) {
                         </Link>
                     </>
                     )}
-                    <div onClick={closeSheet}>
+                    <div>
                         <HelpDialog>
                             <Button variant="ghost" className="w-full justify-start text-base font-medium p-2 h-auto">
                                 <HelpCircle size={18} className="mr-2" /> Ayuda
