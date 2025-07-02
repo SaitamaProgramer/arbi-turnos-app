@@ -27,7 +27,6 @@ export interface ShiftRequestWithMatches extends ShiftRequest {
 export interface Club {
   id: string; 
   name: string;
-  adminUserId: string; 
 }
 
 export interface User {
@@ -35,7 +34,7 @@ export interface User {
   name: string;
   email: string;
   role: 'admin' | 'referee';
-  administeredClubId?: string; 
+  administeredClubIds?: string[];
   memberClubIds?: string[]; 
   password?: string; // Should only be present when creating/checking, not on fetched user objects
   isDeveloper?: boolean; // Flag to identify the developer user

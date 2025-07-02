@@ -26,13 +26,12 @@ const schemaCreationCommands = [
   );`,
   `CREATE TABLE IF NOT EXISTS clubs (
     id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    admin_user_id TEXT NOT NULL,
-    FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE CASCADE
+    name TEXT NOT NULL
   );`,
   `CREATE TABLE IF NOT EXISTS user_clubs_membership (
     user_id TEXT NOT NULL,
     club_id TEXT NOT NULL,
+    role_in_club TEXT NOT NULL CHECK(role_in_club IN ('admin', 'referee')) DEFAULT 'referee',
     PRIMARY KEY (user_id, club_id),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE

@@ -73,8 +73,12 @@ export async function registerUser(payload: RegisterUserPayload) {
                     args: [newUserId, name, email, hashedPassword, role]
                 });
                 await tx.execute({
-                    sql: 'INSERT INTO clubs (id, name, admin_user_id) VALUES (?, ?, ?)',
-                    args: [newClubId, clubName, newUserId]
+                    sql: 'INSERT INTO clubs (id, name) VALUES (?, ?)',
+                    args: [newClubId, clubName]
+                });
+                await tx.execute({
+                    sql: 'INSERT INTO user_clubs_membership (user_id, club_id, role_in_club) VALUES (?, ?, ?)',
+                    args: [newUserId, newClubId, 'admin']
                 });
 
             } else { // role === 'referee'
@@ -90,8 +94,8 @@ export async function registerUser(payload: RegisterUserPayload) {
                     args: [newUserId, name, email, hashedPassword, role]
                 });
                 await tx.execute({
-                    sql: 'INSERT INTO user_clubs_membership (user_id, club_id) VALUES (?, ?)',
-                    args: [newUserId, clubIdToJoin]
+                    sql: 'INSERT INTO user_clubs_membership (user_id, club_id, role_in_club) VALUES (?, ?, ?)',
+                    args: [newUserId, clubIdToJoin, 'referee']
                 });
             }
             await tx.commit();
@@ -277,7 +281,7 @@ export async function getSuggestions(): Promise<Suggestion[]> {
 
 export async function saveClubDefinedMatches(clubId: string, matches: Omit<ClubSpecificMatch, 'clubId'>[]) {
     const user = await getUserFromSession();
-    if (!user || user.role !== 'admin' || user.administeredClubId !== clubId) {
+    if (!user || user.role !== 'admin' || !user.administeredClubIds?.includes(clubId)) {
         return { success: false, error: 'No tienes permiso para realizar esta acción.' };
     }
     
@@ -436,7 +440,7 @@ export async function submitAvailability(payload: z.infer<typeof availabilitySch
             return { error: "Ya tienes una postulación pendiente para esta asociación. Por favor, edítala." };
         }
 
-        const requestId = `req_${randomBytes(8).toString('hex')}`;
+        const requestId = `req_${randomBytes(6).toString('hex')}`;
         const submittedAt = new Date().toISOString();
 
         const tx = await db.transaction('write');
@@ -543,7 +547,7 @@ export async function updateAvailability(requestId: string, payload: z.infer<typ
 
 export async function assignRefereeToMatch(clubId: string, matchId: string, refereeId: string) {
     const user = await getUserFromSession();
-    if (!user || user.role !== 'admin' || user.administeredClubId !== clubId) {
+    if (!user || user.role !== 'admin' || !user.administeredClubIds?.includes(clubId)) {
         return { success: false, error: 'No tienes permiso para realizar esta acción.' };
     }
 
@@ -596,7 +600,7 @@ export async function assignRefereeToMatch(clubId: string, matchId: string, refe
 
 export async function unassignRefereeFromMatch(clubId: string, matchId: string) {
     const user = await getUserFromSession();
-    if (!user || user.role !== 'admin' || user.administeredClubId !== clubId) {
+    if (!user || user.role !== 'admin' || !user.administeredClubIds?.includes(clubId)) {
         return { success: false, error: 'No tienes permiso para realizar esta acción.' };
     }
     try {
@@ -623,7 +627,7 @@ export async function submitSuggestion(suggestionText: string) {
     try {
         const user = await getUserFromSession();
         
-        const newSuggestionId = `sug_${randomBytes(8).toString('hex')}`;
+        const newSuggestionId = `sug_${randomBytes(6).toString('hex')}`;
         const submittedAt = new Date().toISOString();
         const userId = user?.id ?? null;
         const userName = user?.name ?? 'Anónimo';
@@ -672,8 +676,8 @@ export async function joinAnotherClub(clubIdToJoin: string) {
             }
 
             await tx.execute({
-                sql: 'INSERT INTO user_clubs_membership (user_id, club_id) VALUES (?, ?)',
-                args: [userId, clubIdToJoinTrimmed]
+                sql: 'INSERT INTO user_clubs_membership (user_id, club_id, role_in_club) VALUES (?, ?, ?)',
+                args: [userId, clubIdToJoinTrimmed, 'referee']
             });
             await tx.commit();
         } catch (err: any) {

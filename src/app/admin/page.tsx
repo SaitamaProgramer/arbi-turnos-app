@@ -27,11 +27,12 @@ export default async function AdminPage() {
   if (!user) {
     redirect('/login');
   }
-  if (user.role !== 'admin' || !user.administeredClubId) {
+  if (user.role !== 'admin' || !user.administeredClubIds || user.administeredClubIds.length === 0) {
      redirect('/');
   }
 
-  const adminClubId = user.administeredClubId;
+  // For now, we manage the first club in the list. A future improvement would be a club selector.
+  const adminClubId = user.administeredClubIds[0];
 
   // Fetch admin data and suggestions in parallel for better performance
   const adminDataPromise = getAdminPageData(adminClubId);
