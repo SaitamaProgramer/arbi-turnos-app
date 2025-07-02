@@ -18,6 +18,7 @@ import {
 import type { User } from "@/types";
 import { logout } from "@/lib/actions";
 import { HelpDialog } from "./help-dialog";
+import { Dialog } from "../ui/dialog";
 
 interface MobileNavProps {
   currentUser: User | null;
@@ -30,7 +31,7 @@ export function MobileNav({ currentUser }: MobileNavProps) {
   const closeSheet = () => setIsOpen(false);
 
   return (
-    <div className="md:hidden">
+    <div className="lg:hidden">
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetTrigger asChild>
             <Button variant="ghost" size="icon">
@@ -79,7 +80,7 @@ export function MobileNav({ currentUser }: MobileNavProps) {
                         </Link>
                     </>
                     )}
-                    <div>
+                    <div onClick={(e) => e.stopPropagation()}>
                         <HelpDialog>
                             <Button variant="ghost" className="w-full justify-start text-base font-medium p-2 h-auto">
                                 <HelpCircle size={18} className="mr-2" /> Ayuda

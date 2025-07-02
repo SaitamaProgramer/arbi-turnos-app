@@ -1,4 +1,3 @@
-
 import Link from 'next/link';
 import { UsersRound, LogIn, UserPlus, LogOut, ShieldCheck, UserCog } from 'lucide-react';
 import { getUserFromSession } from '@/lib/session';
@@ -30,7 +29,7 @@ export default async function Navbar() {
         </Link>
         
         {/* Desktop Navigation */}
-        <div className="hidden md:flex space-x-1 sm:space-x-2 items-center">
+        <div className="hidden lg:flex space-x-1 sm:space-x-2 items-center">
           {currentUser && currentUser.role !== 'admin' && (
             <Link href="/" className="text-foreground hover:text-primary transition-colors font-medium text-sm sm:text-base">
               Disponibilidad
