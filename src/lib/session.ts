@@ -99,6 +99,11 @@ export async function getFullUserFromDb(userId: string): Promise<User | null> {
             user.memberClubIds = memberClubsResult.rows.map(mc => mc.club_id as string);
         }
 
+        // Add the isDeveloper flag based on the environment variable
+        if (user.role === 'admin' && process.env.DEVELOPER_EMAIL) {
+            user.isDeveloper = user.email === process.env.DEVELOPER_EMAIL;
+        }
+
         // Make sure to not leak the password hash if it ever gets selected by accident.
         delete user.password;
 

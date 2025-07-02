@@ -1,3 +1,4 @@
+
 "use client";
 
 import type { ShiftRequestWithMatches, ClubSpecificMatch, User, MatchAssignment } from "@/types";
@@ -28,11 +29,12 @@ import {
   assignRefereeToMatch,
   unassignRefereeFromMatch,
 } from "@/lib/actions"; 
-import { UserCheck, UserPlus, Edit, Trash2, Users, CalendarCheck2, AlertTriangle, Loader2 } from "lucide-react";
+import { UserCheck, UserPlus, Edit, Trash2, Users, CalendarCheck2, AlertTriangle, Loader2, CheckCircle, XCircle, Clock, Ban } from "lucide-react";
 import { useState, useMemo, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { es } from "date-fns/locale";
+import { cn } from "@/lib/utils";
 
 interface ShiftTableProps {
   clubId: string; 
@@ -53,6 +55,12 @@ interface PostulatedRefereeDetails {
   notes?: string;
 }
 
+const MatchStatusBadge = ({ status, text, icon, className }: { status: string, text: string, icon: React.ReactNode, className: string }) => (
+  <Badge variant="outline" className={cn("text-xs whitespace-nowrap", className)}>
+    {icon} {text}
+  </Badge>
+);
+
 export default function ShiftTable({ 
   clubId, 
   initialDefinedMatches,
@@ -67,16 +75,28 @@ export default function ShiftTable({
   const [assignDialogState, setAssignDialogState] = useState<AssignDialogState>({ open: false, matchToAssign: null });
   const [selectedRefereeId, setSelectedRefereeId] = useState<string>("");
   
-  const [definedMatches, setDefinedMatches] = useState(initialDefinedMatches);
+  const [definedMatches, setDefinedMatches] = useState<ClubSpecificMatch[]>([]);
   const [shiftRequests, setShiftRequests] = useState(initialShiftRequests);
   const [assignments, setAssignments] = useState(initialMatchAssignments);
   
-  // Sincroniza el estado del componente con las props actualizadas después de un router.refresh().
-  // Esto es crucial para que la UI se actualice después de una acción del servidor.
+  const [pastMatchIds, setPastMatchIds] = useState(new Set<string>());
+
   useEffect(() => {
-    setDefinedMatches(initialDefinedMatches);
+    // Sort matches by date, descending, and update state
+    const sortedMatches = [...initialDefinedMatches].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    setDefinedMatches(sortedMatches);
     setShiftRequests(initialShiftRequests);
     setAssignments(initialMatchAssignments);
+
+    const today = startOfDay(new Date());
+    const pastIds = new Set<string>();
+    initialDefinedMatches.forEach(match => {
+        if (isBefore(parseISO(match.date), today)) {
+            pastIds.add(match.id);
+        }
+    });
+    setPastMatchIds(pastIds);
+
   }, [initialDefinedMatches, initialShiftRequests, initialMatchAssignments]);
   
   const getRefereeNameById = (userId: string) => initialClubReferees.find(u => u.id === userId)?.name || 'Desconocido';
@@ -124,6 +144,7 @@ export default function ShiftTable({
           toast({
             title: "Árbitro Asignado",
             description: `${getRefereeNameById(selectedRefereeId) || selectedRefereeId} ha sido asignado.`,
+            variant: 'success'
           });
           router.refresh(); 
         } else {
@@ -186,9 +207,11 @@ export default function ShiftTable({
             const postulatedRefereeDetails = postulatedRefereesByMatchId.get(match.id) || [];
             const assignment = assignments.find(a => a.matchId === match.id);
             const assignedRefereeName = assignment ? getRefereeNameById(assignment.assignedRefereeId) : null;
+            const isPast = pastMatchIds.has(match.id);
+            const isActionsDisabled = isPast || match.status === 'cancelled' || match.status === 'postponed';
 
             return (
-              <TableRow key={match.id}>
+              <TableRow key={match.id} className={cn(isPast && "bg-muted/40 opacity-70")}>
                 <TableCell className="font-medium align-top pt-3">
                   <p className="font-semibold">{match.description}</p>
                   <p className="text-xs text-muted-foreground">
@@ -217,34 +240,54 @@ export default function ShiftTable({
                   )}
                 </TableCell>
                 <TableCell className="text-right align-top pt-3">
-                  {assignment ? (
-                    <div className="flex flex-col items-end gap-1.5">
-                      <Badge variant="default" className="bg-primary text-primary-foreground text-xs whitespace-nowrap self-end mb-1 px-2 py-1">
-                        <UserCheck className="mr-1 h-3 w-3" /> Asignado: {assignedRefereeName}
-                      </Badge>
-                      <div className="flex gap-1">
-                        <Button variant="outline" size="sm" onClick={() => openAssignDialog(match)} className="h-7 px-2 py-1 text-xs whitespace-nowrap" disabled={isPending}>
-                          <Edit size={12} className="mr-1"/> Reasignar
-                        </Button>
-                        <Button variant="ghost" size="sm" onClick={() => handleUnassignShift(match.id)} className="h-7 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 whitespace-nowrap" disabled={isPending}>
-                          <Trash2 size={12} className="mr-1"/> Quitar
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <Button 
-                      variant={postulatedRefereeDetails.length > 0 ? "default" : "outline"}
-                      size="sm" 
-                      onClick={() => openAssignDialog(match)} 
-                      className="h-7 px-2 py-1 text-xs whitespace-nowrap"
-                      disabled={postulatedRefereeDetails.length === 0 || isPending} 
-                    >
-                      <UserPlus className="mr-1 h-3 w-3" /> Asignar Árbitro
-                    </Button>
-                  )}
-                   {postulatedRefereeDetails.length === 0 && !assignment && (
-                     <p className="text-xs text-muted-foreground mt-1 italic text-right">Esperando postulantes.</p>
-                   )}
+                   <div className="flex flex-col items-end gap-1.5">
+                      {(() => {
+                        if (isPast) {
+                          if (match.status === 'cancelled') return <MatchStatusBadge status="cancelled" text="Cancelado" icon={<Ban className="mr-1 h-3 w-3"/>} className="border-destructive text-destructive" />;
+                          if (assignment) return <MatchStatusBadge status="played" text="Finalizado" icon={<CheckCircle className="mr-1 h-3 w-3"/>} className="border-green-600 text-green-600"/>;
+                          return <MatchStatusBadge status="expired" text="Expirado" icon={<XCircle className="mr-1 h-3 w-3"/>} className="border-muted-foreground text-muted-foreground"/>;
+                        }
+
+                        if (match.status === 'cancelled') return <MatchStatusBadge status="cancelled" text="Cancelado" icon={<Ban className="mr-1 h-3 w-3"/>} className="border-destructive text-destructive" />;
+                        if (match.status === 'postponed') return <MatchStatusBadge status="postponed" text="Pospuesto" icon={<Clock className="mr-1 h-3 w-3"/>} className="border-yellow-600 text-yellow-600"/>;
+
+                        if (assignment) {
+                          return (
+                            <Badge variant="default" className="bg-primary text-primary-foreground text-xs whitespace-nowrap self-end mb-1 px-2 py-1">
+                              <UserCheck className="mr-1 h-3 w-3" /> Asignado: {assignedRefereeName}
+                            </Badge>
+                          )
+                        }
+                        return null; // No badge if it's just scheduled
+                      })()}
+                      
+                      {!isActionsDisabled && assignment && (
+                         <div className="flex gap-1">
+                            <Button variant="outline" size="sm" onClick={() => openAssignDialog(match)} className="h-7 px-2 py-1 text-xs whitespace-nowrap" disabled={isPending}>
+                              <Edit size={12} className="mr-1"/> Reasignar
+                            </Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleUnassignShift(match.id)} className="h-7 px-2 py-1 text-xs text-destructive hover:bg-destructive/10 whitespace-nowrap" disabled={isPending}>
+                              <Trash2 size={12} className="mr-1"/> Quitar
+                            </Button>
+                          </div>
+                      )}
+                      
+                      {!isActionsDisabled && !assignment && (
+                          <Button 
+                            variant={postulatedRefereeDetails.length > 0 ? "default" : "outline"}
+                            size="sm" 
+                            onClick={() => openAssignDialog(match)} 
+                            className="h-7 px-2 py-1 text-xs whitespace-nowrap"
+                            disabled={postulatedRefereeDetails.length === 0 || isPending} 
+                          >
+                            <UserPlus className="mr-1 h-3 w-3" /> Asignar Árbitro
+                          </Button>
+                      )}
+                      
+                      {postulatedRefereeDetails.length === 0 && !assignment && !isActionsDisabled && (
+                        <p className="text-xs text-muted-foreground mt-1 italic text-right">Esperando postulantes.</p>
+                      )}
+                   </div>
                 </TableCell>
               </TableRow>
             );
@@ -305,5 +348,3 @@ export default function ShiftTable({
     </div>
   );
 }
-
-    

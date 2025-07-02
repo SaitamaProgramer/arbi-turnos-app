@@ -6,6 +6,7 @@ export interface ClubSpecificMatch {
   date: string; // ISO string for date, e.g., "2024-07-28T00:00:00.000Z" or just "2024-07-28"
   time: string; // e.g., "15:00"
   location: string;
+  status: 'scheduled' | 'cancelled' | 'postponed';
 }
 
 export interface ShiftRequest {
@@ -37,6 +38,7 @@ export interface User {
   administeredClubId?: string; 
   memberClubIds?: string[]; 
   password?: string; // Should only be present when creating/checking, not on fetched user objects
+  isDeveloper?: boolean; // Flag to identify the developer user
 }
 
 export type RegisterUserPayload = Omit<User, 'id'> & {
@@ -68,4 +70,17 @@ export interface AvailabilityFormData {
   }
 }
 
-    
+export interface Suggestion {
+  id: string;
+  userId?: string;
+  userName?: string;
+  suggestionText: string;
+  submittedAt: string;
+}
+
+export interface UserStats {
+  associationsCount: number;
+  refereedMatchesCount: number;
+  cancelledMatchesCount: number;
+  postulationsCount: number;
+}

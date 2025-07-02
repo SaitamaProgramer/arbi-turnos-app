@@ -20,11 +20,7 @@ import { useToast } from "@/hooks/use-toast";
 import { LogIn, Eye, EyeOff } from "lucide-react";
 import { login } from "@/lib/actions";
 import { useTransition, useState } from "react";
-import type { Metadata } from 'next';
-
-// Note: generateMetadata can't be used in client components.
-// We can set a static title here or handle it differently if needed.
-// For simplicity, we'll let the layout handle the title.
+import { useRouter } from "next/navigation";
 
 const loginFormSchema = z.object({
   email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),
@@ -37,6 +33,7 @@ export default function LoginPage() {
   const { toast } = useToast();
   const [isPending, startTransition] = useTransition();
   const [showPassword, setShowPassword] = useState(false);
+  const router = useRouter();
 
   const form = useForm<LoginFormValues>({
     resolver: zodResolver(loginFormSchema),
@@ -55,6 +52,13 @@ export default function LoginPage() {
           description: result.error,
           variant: "destructive",
         });
+      } else if (result?.success && result.redirectUrl) {
+        toast({
+          title: "¡Inicio de sesión exitoso!",
+          variant: "success",
+        });
+        router.push(result.redirectUrl);
+        router.refresh();
       }
     });
   }

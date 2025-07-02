@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import {
   Form,
   FormControl,
+  FormDescription,
   FormField,
   FormItem,
   FormLabel,
@@ -21,17 +22,14 @@ import { useToast } from "@/hooks/use-toast";
 import { UserPlus, ShieldCheck, Briefcase, Eye, EyeOff } from "lucide-react";
 import { useState, useTransition } from "react";
 import { registerUser } from "@/lib/actions";
-import type { Metadata } from 'next';
-
-// Note: generateMetadata can't be used in client components.
-// For simplicity, we'll let the layout handle the title.
+import { useRouter } from "next/navigation";
 
 const registerFormSchemaBase = z.object({
   name: z.string().min(2, { message: "El nombre debe tener al menos 2 caracteres." }),
   email: z.string().email({ message: "Por favor, introduce un correo electrónico válido." }),
   password: z.string()
     .min(6, { message: "La contraseña debe tener al menos 6 caracteres." })
-    .regex(/^(?=.*[a-zA-Z])(?=.*\d).*$/, { message: "La contraseña debe contener al menos una letra y un número." }),
+    .regex(/^(?=.*[A-Z])(?=.*\d).+$/, { message: "La contraseña debe contener al menos una letra mayúscula y un número." }),
   confirmPassword: z.string(),
   role: z.enum(["admin", "referee"], { required_error: "Debes seleccionar un rol." }),
 });
@@ -68,6 +66,7 @@ export default function RegisterPage() {
   const [isPending, startTransition] = useTransition();
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const router = useRouter();
 
   const form = useForm<RegisterFormValues>({
     resolver: zodResolver(registerFormSchema),
@@ -91,6 +90,14 @@ export default function RegisterPage() {
           description: result.error,
           variant: "destructive",
         });
+      } else if (result?.success && result.redirectUrl) {
+        toast({
+          title: "¡Registro exitoso!",
+          description: "Serás redirigido en breve.",
+          variant: "success",
+        });
+        router.push(result.redirectUrl);
+        router.refresh();
       }
     });
   }
@@ -230,6 +237,9 @@ export default function RegisterPage() {
                         {showPassword ? <EyeOff className="h-5 w-5" /> : <Eye className="h-5 w-5" />}
                       </button>
                     </div>
+                    <FormDescription>
+                      Mínimo 6 caracteres, 1 mayúscula y 1 número.
+                    </FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}

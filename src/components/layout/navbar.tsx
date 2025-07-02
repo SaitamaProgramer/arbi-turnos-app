@@ -1,17 +1,18 @@
 
 import Link from 'next/link';
-import { UsersRound, LogIn, UserPlus, LogOut, ShieldCheck } from 'lucide-react';
+import { UsersRound, LogIn, UserPlus, LogOut, ShieldCheck, UserCog } from 'lucide-react';
 import { getUserFromSession } from '@/lib/session';
 import { Button } from '@/components/ui/button';
 import { logout } from '@/lib/actions';
 import { HelpDialog } from './help-dialog';
+import { MobileNav } from './mobile-nav';
 
 async function LogoutButton() {
   return (
     <form action={logout}>
       <Button variant="ghost" size="sm" type="submit" className="text-foreground hover:text-primary">
           <LogOut size={18} className="mr-1 sm:mr-2" />
-          Salir
+          <span className="hidden sm:inline">Salir</span>
       </Button>
     </form>
   )
@@ -27,8 +28,10 @@ export default async function Navbar() {
           <UsersRound size={28} strokeWidth={2.5} />
           <h1 className="text-2xl font-bold">ArbiTurnos</h1>
         </Link>
-        <div className="space-x-1 sm:space-x-2 flex items-center">
-          {currentUser && (
+        
+        {/* Desktop Navigation */}
+        <div className="hidden md:flex space-x-1 sm:space-x-2 items-center">
+          {currentUser && currentUser.role !== 'admin' && (
             <Link href="/" className="text-foreground hover:text-primary transition-colors font-medium text-sm sm:text-base">
               Disponibilidad
             </Link>
@@ -45,6 +48,10 @@ export default async function Navbar() {
 
           {currentUser ? (
             <>
+              <Link href="/account" className="text-foreground hover:text-primary transition-colors font-medium text-sm sm:text-base inline-flex items-center">
+                <UserCog size={18} className="mr-1 sm:mr-2" />
+                Mi Cuenta
+              </Link>
               <span className="text-sm text-muted-foreground hidden sm:inline">Hola, {currentUser.name.split(' ')[0]}</span>
               <LogoutButton />
             </>
@@ -61,6 +68,9 @@ export default async function Navbar() {
             </>
           )}
         </div>
+
+        {/* Mobile Navigation */}
+        <MobileNav currentUser={currentUser} />
       </nav>
     </header>
   );

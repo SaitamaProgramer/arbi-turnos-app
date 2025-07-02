@@ -20,10 +20,10 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { isMatchEditable } from "@/lib/utils";
 import type { ClubSpecificMatch, MatchAssignment, ShiftRequestWithMatches } from "@/types";
-import { ListChecks, Car, ClipboardList, Send, Loader2, AlertTriangle, Edit3, Info, Ban } from "lucide-react";
-import { useTransition } from "react";
+import { ListChecks, Car, ClipboardList, Send, Loader2, AlertTriangle, Edit3, Info, Ban, Clock, BadgeCheck } from "lucide-react";
+import { useTransition, useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { es } from "date-fns/locale";
 import { cn } from "@/lib/utils";
 import { submitAvailability, updateAvailability } from "@/lib/actions";
@@ -53,6 +53,32 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const isEditing = !!postulation;
+
+  const [nonEditableByDateMatchIds, setNonEditableByDateMatchIds] = useState(new Set<string>());
+
+  const matchesForForm = useMemo(() => {
+    const today = startOfDay(new Date());
+    const postulatedMatchIds = new Set(postulation?.selectedMatches.map(m => m.id) || []);
+
+    const allMatches = matches.filter(match => {
+        const isPostulated = postulatedMatchIds.has(match.id);
+        const isFutureAndScheduled = !isBefore(parseISO(match.date), today) && match.status === 'scheduled';
+        return isPostulated || isFutureAndScheduled;
+    });
+    
+    return allMatches.sort((a,b) => parseISO(a.date).getTime() - parseISO(b.date).getTime());
+  }, [matches, postulation]);
+  
+  useEffect(() => {
+    const nonEditableIds = new Set<string>();
+    matchesForForm.forEach(match => {
+        if (!isMatchEditable(match.date)) {
+            nonEditableIds.add(match.id);
+        }
+    });
+    setNonEditableByDateMatchIds(nonEditableIds);
+  }, [matchesForForm]);
+
 
   const form = useForm<AvailabilityFormValues>({
     resolver: zodResolver(availabilityFormSchema),
@@ -88,21 +114,22 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
         toast({
           title: isEditing ? "Postulación Actualizada" : "Postulación Enviada",
           description: "Tus datos han sido guardados.",
+          variant: "success",
         });
         router.refresh();
       }
     });
   }
 
-  if (matches.length === 0) {
+  if (matchesForForm.length === 0) {
     return (
       <div className="text-center py-6">
         <AlertTriangle className="mx-auto h-10 w-10 text-yellow-500 mb-3" />
         <p className="text-lg font-semibold text-muted-foreground mb-1">
-          No hay Partidos Definidos para {clubName}
+          No hay Partidos Disponibles para {clubName}
         </p>
         <p className="text-xs text-muted-foreground">
-          El administrador de la asociación aún no ha definido partidos/turnos.
+          El administrador de la asociación no ha definido partidos futuros programados.
         </p>
       </div>
     );
@@ -133,42 +160,47 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
                   <FormLabel className="text-base flex items-center gap-2"><ListChecks className="text-primary" />Partidos/Turnos Disponibles</FormLabel>
                 </div>
                 <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
-                  {matches.map((match) => (
+                  {matchesForForm.map((match) => (
                     <FormField
                       key={match.id}
                       control={form.control}
                       name="selectedMatchIds"
                       render={({ field }) => {
                         const isChecked = field.value?.includes(match.id);
-                        const isThisMatchActuallyEditableByDate = isMatchEditable(match.date);
+                        const isThisMatchActuallyEditableByDate = !nonEditableByDateMatchIds.has(match.id);
                         const isThisMatchAssignedToCurrentUser = assignments.some(asg => asg.matchId === match.id);
-                        const disableCheckbox = !canEdit || !isThisMatchActuallyEditableByDate || isThisMatchAssignedToCurrentUser;
-
+                        
+                        const canBeSelected = match.status === 'scheduled' && isThisMatchActuallyEditableByDate && !isThisMatchAssignedToCurrentUser;
+                        const disableCheckbox = isPending || !canEdit || (!isChecked && !canBeSelected);
+                        
                         return (
                           <FormItem
                             key={match.id}
                             className={cn("flex flex-row items-start space-x-3 space-y-0 p-3 bg-muted/30 rounded-md border",
                               (disableCheckbox && !isChecked) && "opacity-70 cursor-not-allowed",
-                              (isThisMatchAssignedToCurrentUser) && "border-green-500"
+                              isThisMatchAssignedToCurrentUser && "border-green-500",
+                              match.status === 'cancelled' && "border-destructive/50",
+                              match.status === 'postponed' && "border-yellow-500/50",
                             )}
                           >
                             <FormControl>
                               <Checkbox
                                 checked={isChecked}
                                 onCheckedChange={(checked) => {
-                                  if (disableCheckbox && !isChecked) return;
-                                  if (isThisMatchAssignedToCurrentUser) return;
+                                  if (disableCheckbox) return;
                                   return checked
                                     ? field.onChange([...(field.value || []), match.id])
                                     : field.onChange((field.value || []).filter((id) => id !== match.id));
                                 }}
-                                disabled={isPending || (disableCheckbox && !isChecked) || isThisMatchAssignedToCurrentUser}
+                                disabled={disableCheckbox}
                               />
                             </FormControl>
                             <div className="flex-1">
-                              <FormLabel className={cn("font-normal text-sm", (disableCheckbox && !isChecked) && "text-muted-foreground/70")}>
+                               <FormLabel className={cn("font-normal text-sm flex items-center gap-2", (disableCheckbox && !isChecked) && "text-muted-foreground/70")}>
                                 {match.description}
-                                {isThisMatchAssignedToCurrentUser && <Badge variant="default" className="ml-2 bg-green-500 text-white text-[10px] px-1.5 py-0.5">Asignado a ti</Badge>}
+                                {isThisMatchAssignedToCurrentUser && <Badge variant="default" className="bg-green-500 hover:bg-green-500 text-white text-[10px] px-1.5 py-0.5"><BadgeCheck size={12} className="mr-1"/>Asignado a ti</Badge>}
+                                {match.status === 'cancelled' && <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5"><Ban size={12} className="mr-1"/>Cancelado</Badge>}
+                                {match.status === 'postponed' && <Badge variant="outline" className="text-yellow-600 border-yellow-500 text-[10px] px-1.5 py-0.5"><Clock size={12} className="mr-1"/>Pospuesto</Badge>}
                               </FormLabel>
                               <p className={cn("text-xs text-muted-foreground", (disableCheckbox && !isChecked) && "text-muted-foreground/50")}>
                                 {format(parseISO(match.date), "dd/MM/yy", { locale: es })} - {match.time} hs. en {match.location}
