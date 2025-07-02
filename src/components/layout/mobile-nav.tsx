@@ -1,9 +1,8 @@
-
 "use client";
 
 import { useState } from "react";
 import Link from "next/link";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import {
   Menu,
@@ -40,6 +39,12 @@ export function MobileNav({ currentUser }: MobileNavProps) {
             </Button>
         </SheetTrigger>
         <SheetContent side="left" className="p-0 pt-4 w-[300px] flex flex-col">
+            <SheetHeader className="sr-only">
+              <SheetTitle>Navegación Principal</SheetTitle>
+              <SheetDescription>
+                Enlaces para navegar por la aplicación ArbiTurnos.
+              </SheetDescription>
+            </SheetHeader>
             <div className="px-4 pb-4 border-b">
                 <Link href="/" className="flex items-center gap-2 text-primary" onClick={closeSheet}>
                     <UsersRound size={28} strokeWidth={2.5} />
