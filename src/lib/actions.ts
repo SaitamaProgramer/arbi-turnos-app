@@ -69,7 +69,7 @@ export async function registerUser(payload: RegisterUserPayload) {
 
             if (role === 'admin') {
                 if (!clubName) throw new Error('El nombre de la asociación es requerido para administradores.');
-                const newClubId = `club_${randomBytes(4).toString('hex')}`;
+                const newClubId = `club_${randomBytes(8).toString('hex')}`;
                 
                 await tx.execute({
                     sql: 'INSERT INTO clubs (id, name) VALUES (?, ?)',
@@ -208,7 +208,7 @@ export async function getAdminPageData(clubId: string) {
                 args: [clubId]
             }),
             db.execute({
-                sql: 'SELECT id, club_id, match_id, assigned_referee_id, assigned_at FROM match_assignments WHERE club_id = ?',
+                sql: 'SELECT id, club_id, match_id, assigned_referee_id, assignment_role, assigned_at FROM match_assignments WHERE club_id = ?',
                 args: [clubId]
             }),
         ]);
@@ -387,7 +387,7 @@ export async function getAvailabilityFormData(userId: string) {
                     args: [club.id]
                 }),
                 db.execute({
-                    sql: 'SELECT match_id, assigned_referee_id FROM match_assignments WHERE club_id = ? AND assigned_referee_id = ?',
+                    sql: 'SELECT id, club_id, match_id, assigned_referee_id, assignment_role, assigned_at FROM match_assignments WHERE club_id = ? AND assigned_referee_id = ?',
                     args: [club.id, userId]
                 }),
                 db.execute({
@@ -397,7 +397,7 @@ export async function getAvailabilityFormData(userId: string) {
             ]);
 
             const matches = rowsToType<ClubSpecificMatch>(matchesResult.rows);
-            const assignments = rowsToType<Omit<MatchAssignment, 'id'| 'clubId' | 'assignedAt'>>(assignmentsResult.rows);
+            const assignments = rowsToType<MatchAssignment>(assignmentsResult.rows);
             const postulationRow = rowsToType<ShiftRequest>(postulationResult.rows)[0];
             
             let postulationWithMatches: ShiftRequestWithMatches | null = null;
@@ -538,10 +538,10 @@ export async function updateAvailability(requestId: string, payload: z.infer<typ
             const matchesInRequest = rowsToType<ClubSpecificMatch>(matchesInRequestDataResult.rows);
 
             const assignmentsForUserResult = await db.execute({
-                sql: 'SELECT match_id, assigned_referee_id FROM match_assignments WHERE club_id = ? AND assigned_referee_id = ?',
+                sql: 'SELECT id, club_id, match_id, assigned_referee_id, assignment_role, assigned_at FROM match_assignments WHERE club_id = ? AND assigned_referee_id = ?',
                 args: [selectedClubId, userId]
             });
-            const assignmentsForUser = rowsToType<Omit<MatchAssignment, 'id'| 'clubId' | 'assignedAt'>>(assignmentsForUserResult.rows);
+            const assignmentsForUser = rowsToType<MatchAssignment>(assignmentsForUserResult.rows);
             
             if (!isPostulationEditable(matchesInRequest, assignmentsForUser)) {
                 return { error: 'La postulación no es editable porque uno o más partidos están muy próximos o ya han sido asignados.' };
@@ -577,73 +577,65 @@ export async function updateAvailability(requestId: string, payload: z.infer<typ
     }
 }
 
-export async function assignRefereeToMatch(clubId: string, matchId: string, refereeId: string) {
+export async function setAssignmentsForRole(clubId: string, matchId: string, assignedIds: string[], role: 'referee' | 'assistant') {
     const user = await getUserFromSession();
     if (!user || !user.isAdmin || !user.administeredClubIds?.includes(clubId)) {
         return { success: false, error: 'No tienes permiso para realizar esta acción.' };
     }
 
-    try {
-        const [matchToAssignResult, refereeAssignmentsResult] = await Promise.all([
-             db.execute({
-                sql: 'SELECT id, club_id, description, match_date as date, match_time as time, location, status FROM club_matches WHERE id = ?',
-                args: [matchId]
-            }),
-             db.execute({
-                sql: `
-                    SELECT m.description, m.match_date as date, m.match_time as time
-                    FROM match_assignments a
-                    JOIN club_matches m ON a.match_id = m.id
-                    WHERE a.assigned_referee_id = ? AND a.club_id = ? AND m.status = 'scheduled'
-                `,
-                args: [refereeId, clubId]
-            })
-        ]);
-        
-        const matchToAssign = rowsToType<ClubSpecificMatch>(matchToAssignResult.rows)[0];
-        if (!matchToAssign) {
-            return { error: "El partido a asignar no fue encontrado." };
-        }
+    if (assignedIds.length > 6) {
+        return { success: false, error: `No se pueden asignar más de 6 ${role === 'referee' ? 'árbitros' : 'asistentes'} a un partido.` };
+    }
 
-        for (const row of refereeAssignmentsResult.rows) {
-             const currentAsg = rowsToType<any>([row])[0];
-             if (currentAsg.date === matchToAssign.date && currentAsg.time === matchToAssign.time) {
-                return { error: `Este árbitro ya está asignado a "${currentAsg.description}" a la misma fecha y hora.` };
-             }
+    const tx = await db.transaction('write');
+    try {
+        // Check for conflicts: ensure none of the users are already assigned to the OTHER role for this same match.
+        const oppositeRole = role === 'referee' ? 'assistant' : 'referee';
+        if (assignedIds.length > 0) {
+            const conflictsResult = await tx.execute({
+                sql: `SELECT assigned_referee_id FROM match_assignments WHERE match_id = ? AND assignment_role = ? AND assigned_referee_id IN (${assignedIds.map(() => '?').join(',')})`,
+                args: [matchId, oppositeRole, ...assignedIds]
+            });
+
+            if (conflictsResult.rows.length > 0) {
+                 const conflictingIds = conflictsResult.rows.map(r => r.assigned_referee_id as string);
+                 const userNamesResult = await tx.execute({
+                    sql: `SELECT name FROM users WHERE id IN (${conflictingIds.map(() => '?').join(',')})`,
+                    args: conflictingIds
+                });
+                const userNames = userNamesResult.rows.map(r => r.name as string);
+
+                await tx.rollback();
+                return { success: false, error: `Los siguientes usuarios ya están asignados como ${oppositeRole}s y no pueden tener ambos roles: ${userNames.join(', ')}.` };
+            }
         }
         
-        await db.execute({
-            sql: `
-                INSERT INTO match_assignments (club_id, match_id, assigned_referee_id, assigned_at) 
-                VALUES (?, ?, ?, ?)
-                ON CONFLICT(match_id) DO UPDATE SET
-                assigned_referee_id = excluded.assigned_referee_id,
-                assigned_at = excluded.assigned_at
-            `,
-            args: [clubId, matchId, refereeId, new Date().toISOString()]
+        // Proceed with update
+        // 1. Delete all existing assignments for this match and role
+        await tx.execute({
+            sql: 'DELETE FROM match_assignments WHERE match_id = ? AND assignment_role = ?',
+            args: [matchId, role]
         });
 
+        // 2. Insert new assignments
+        if (assignedIds.length > 0) {
+            const assignedAt = new Date().toISOString();
+            for (const refereeId of assignedIds) {
+                await tx.execute({
+                    sql: `
+                        INSERT INTO match_assignments (club_id, match_id, assigned_referee_id, assignment_role, assigned_at) 
+                        VALUES (?, ?, ?, ?, ?)
+                    `,
+                    args: [clubId, matchId, refereeId, role, assignedAt]
+                });
+            }
+        }
+        await tx.commit();
         return { success: true };
     } catch(e: any) {
-        console.error("assignRefereeToMatch error:", e.message);
-        return { error: 'No se pudo asignar al árbitro.' };
-    }
-}
-
-export async function unassignRefereeFromMatch(clubId: string, matchId: string) {
-    const user = await getUserFromSession();
-    if (!user || !user.isAdmin || !user.administeredClubIds?.includes(clubId)) {
-        return { success: false, error: 'No tienes permiso para realizar esta acción.' };
-    }
-    try {
-        await db.execute({
-            sql: 'DELETE FROM match_assignments WHERE club_id = ? AND match_id = ?',
-            args: [clubId, matchId]
-        });
-        return { success: true };
-    } catch(e: any) {
-        console.error("unassignRefereeFromMatch error:", e.message);
-        return { error: 'No se pudo quitar la asignación.' };
+        await tx.rollback();
+        console.error("setAssignmentsForRole error:", e.message);
+        return { success: false, error: 'No se pudo guardar la asignación. Un usuario no puede ser asignado dos veces al mismo partido.' };
     }
 }
 
@@ -848,8 +840,6 @@ export async function promoteUserToAdmin(clubId: string, userIdToPromote: string
     }
 
     try {
-        // Use ON CONFLICT DO NOTHING to make the operation idempotent.
-        // If the user already has the 'admin' role, this will do nothing and not throw an error.
         await db.execute({
             sql: `INSERT INTO user_clubs_membership (user_id, club_id, role_in_club) VALUES (?, ?, 'admin') ON CONFLICT(user_id, club_id, role_in_club) DO NOTHING`,
             args: [userIdToPromote, clubId]
@@ -892,5 +882,3 @@ export async function demoteAdminToReferee(clubId: string, userIdToDemote: strin
         return { success: false, error: "No se pudo actualizar el rol del miembro." };
     }
 }
-
-    

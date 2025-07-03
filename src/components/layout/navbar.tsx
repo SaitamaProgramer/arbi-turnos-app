@@ -30,7 +30,7 @@ export default async function Navbar() {
         </Link>
         
         {/* Desktop Navigation */}
-        <div className="hidden lg:flex space-x-1 sm:space-x-2 items-center">
+        <div className="hidden md:flex space-x-1 sm:space-x-2 items-center">
           {currentUser && (
             <Link href="/" className="text-foreground hover:text-primary transition-colors font-medium text-sm sm:text-base inline-flex items-center">
               <CalendarCheck size={18} className="mr-1 sm:mr-2" />

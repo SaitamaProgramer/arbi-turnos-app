@@ -66,12 +66,14 @@ const schemaCreationCommands = [
   `CREATE TABLE IF NOT EXISTS match_assignments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     club_id TEXT NOT NULL,
-    match_id TEXT NOT NULL UNIQUE,
+    match_id TEXT NOT NULL,
     assigned_referee_id TEXT NOT NULL,
+    assignment_role TEXT NOT NULL CHECK(assignment_role IN ('referee', 'assistant')) DEFAULT 'referee',
     assigned_at TEXT NOT NULL,
     FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
     FOREIGN KEY (match_id) REFERENCES club_matches(id) ON DELETE CASCADE,
-    FOREIGN KEY (assigned_referee_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (assigned_referee_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE (match_id, assigned_referee_id)
   );`,
    `CREATE TABLE IF NOT EXISTS suggestions (
       id TEXT PRIMARY KEY,

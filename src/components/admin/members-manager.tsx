@@ -63,6 +63,43 @@ export default function MembersManager({ clubId, members, currentUserId }: Membe
         });
     };
 
+    const ActionButtonDialog = ({ member }: { member: User }) => (
+      <AlertDialog>
+        <AlertDialogTrigger asChild>
+          {member.roleInClub === 'referee' ? (
+            <Button variant="outline" size="sm" disabled={isPending} className="w-full">
+              <ArrowUpCircle className="mr-2 h-4 w-4"/> Promover a Admin
+            </Button>
+          ) : (
+            <Button variant="destructive" size="sm" disabled={isPending} className="w-full">
+              <ArrowDownCircle className="mr-2 h-4 w-4"/> Revocar Admin
+            </Button>
+          )}
+        </AlertDialogTrigger>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              {member.roleInClub === 'referee'
+                ? `Estás a punto de promover a ${member.name} a Administrador. Tendrá acceso completo a todas las funciones de gestión.`
+                : `Estás a punto de revocar los privilegios de Administrador de ${member.name}. Volverá a ser un Árbitro.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => handleRoleChange(member.id, member.roleInClub === 'referee' ? 'admin' : 'referee')}
+              disabled={isPending}
+              className={member.roleInClub === 'admin' ? 'bg-destructive hover:bg-destructive/90' : ''}
+            >
+              {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+              Confirmar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    );
+
   return (
     <Card>
       <CardHeader>
@@ -72,7 +109,40 @@ export default function MembersManager({ clubId, members, currentUserId }: Membe
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <div className="rounded-lg border">
+        {/* Mobile View */}
+        <div className="space-y-4 md:hidden">
+          {members.map((member) => (
+            <div key={member.id} className="p-4 border rounded-lg bg-muted/30">
+              <div className="flex justify-between items-start">
+                <div>
+                  <p className="font-semibold">{member.name}</p>
+                  <p className="text-sm text-muted-foreground">{member.email}</p>
+                </div>
+                 {member.roleInClub === 'admin' ? (
+                    <Badge variant="default" className="bg-primary/80 text-xs shrink-0">
+                        <ShieldCheck className="mr-1 h-3 w-3"/>
+                        Admin
+                    </Badge>
+                ) : (
+                    <Badge variant="secondary" className="text-xs shrink-0">
+                        <UserIcon className="mr-1 h-3 w-3"/>
+                        Árbitro
+                    </Badge>
+                )}
+              </div>
+              <div className="mt-4 pt-3 border-t border-dashed flex justify-end">
+                {member.id !== currentUserId ? (
+                  <ActionButtonDialog member={member} />
+                ) : (
+                  <span className="text-xs text-muted-foreground italic"> (Tú) </span>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop View */}
+        <div className="hidden rounded-lg border md:block">
             <Table>
             <TableHeader>
                 <TableRow>
@@ -101,44 +171,10 @@ export default function MembersManager({ clubId, members, currentUserId }: Membe
                         )}
                     </TableCell>
                     <TableCell className="text-right">
-                    {member.id !== currentUserId && (
-                        <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                                {member.roleInClub === 'referee' ? (
-                                    <Button variant="outline" size="sm" disabled={isPending}>
-                                        <ArrowUpCircle className="mr-2 h-4 w-4"/> Promover a Admin
-                                    </Button>
-                                ) : (
-                                    <Button variant="destructive" size="sm" disabled={isPending}>
-                                        <ArrowDownCircle className="mr-2 h-4 w-4"/> Revocar Admin
-                                    </Button>
-                                )}
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                                <AlertDialogHeader>
-                                    <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-                                    <AlertDialogDescription>
-                                        {member.roleInClub === 'referee'
-                                        ? `Estás a punto de promover a ${member.name} a Administrador. Tendrá acceso completo a todas las funciones de gestión.`
-                                        : `Estás a punto de revocar los privilegios de Administrador de ${member.name}. Volverá a ser un Árbitro.`}
-                                    </AlertDialogDescription>
-                                </AlertDialogHeader>
-                                <AlertDialogFooter>
-                                    <AlertDialogCancel disabled={isPending}>Cancelar</AlertDialogCancel>
-                                    <AlertDialogAction
-                                        onClick={() => handleRoleChange(member.id, member.roleInClub === 'referee' ? 'admin' : 'referee')}
-                                        disabled={isPending}
-                                        className={member.roleInClub === 'admin' ? 'bg-destructive hover:bg-destructive/90' : ''}
-                                    >
-                                        {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                                        Confirmar
-                                    </AlertDialogAction>
-                                </AlertDialogFooter>
-                            </AlertDialogContent>
-                        </AlertDialog>
-                    )}
-                    {member.id === currentUserId && (
-                        <span className="text-xs text-muted-foreground italic"> (Tú) </span>
+                    {member.id !== currentUserId ? (
+                      <ActionButtonDialog member={member} />
+                    ) : (
+                      <span className="text-xs text-muted-foreground italic"> (Tú) </span>
                     )}
                     </TableCell>
                 </TableRow>
@@ -150,4 +186,3 @@ export default function MembersManager({ clubId, members, currentUserId }: Membe
     </Card>
   );
 }
-

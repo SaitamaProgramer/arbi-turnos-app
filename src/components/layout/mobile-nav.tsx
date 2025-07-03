@@ -32,7 +32,7 @@ export function MobileNav({ currentUser }: MobileNavProps) {
   const closeSheet = () => setIsOpen(false);
 
   return (
-    <div className="lg:hidden">
+    <div className="md:hidden">
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetTrigger asChild>
             <Button variant="ghost" size="icon">

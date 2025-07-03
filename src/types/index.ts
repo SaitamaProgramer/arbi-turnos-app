@@ -55,6 +55,7 @@ export interface MatchAssignment {
   clubId: string;
   matchId: string; 
   assignedRefereeId: string;
+  assignmentRole: 'referee' | 'assistant';
   assignedAt: string;
 }
 
@@ -66,7 +67,7 @@ export interface AvailabilityFormData {
       id: string;
       name: string;
       matches: ClubSpecificMatch[];
-      assignments: Omit<MatchAssignment, 'id' | 'clubId' | 'assignedAt'>[]; // Assignments for the current user in this club
+      assignments: MatchAssignment[]; // Assignments for the current user in this club
       postulation: ShiftRequestWithMatches | null; // Pending postulation for the current user in this club
     }
   }

@@ -1,149 +1,122 @@
 
-import { 
-  getAdminPageData,
-  getSuggestions
-} from "@/lib/actions";
 import { getUserFromSession } from "@/lib/session";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { ClipboardList, ShieldAlert, Info, LayoutDashboard, CalendarPlus, MessageSquare, Users } from "lucide-react";
 import { redirect } from "next/navigation";
+import { getAdminPageData, getSuggestions } from "@/lib/actions";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import AdminDashboard from "@/components/admin/admin-dashboard";
 import ShiftTable from "@/components/admin/shift-table";
 import ClubMatchManager from "@/components/admin/form-config-editor";
-import AdminDashboard from "@/components/admin/admin-dashboard";
+import MembersManager from "@/components/admin/members-manager";
+import SuggestionsView from "@/components/admin/suggestions-view";
+import { AlertTriangle, BadgeInfo, BarChart3, FilePlus2, ListOrdered, Settings, MessageSquare } from "lucide-react";
 import CopyClubIdButton from "@/components/admin/copy-club-id-button";
 import type { Metadata } from 'next';
-import SuggestionsView from "@/components/admin/suggestions-view";
-import MembersManager from "@/components/admin/members-manager";
 
 export const metadata: Metadata = {
   title: 'Panel de Administración',
-  description: 'Gestiona tu asociación, define partidos y asigna árbitros.',
+  description: 'Gestiona tu asociación, partidos, asignaciones y miembros.',
 };
 
-
 export default async function AdminPage() {
-  const user = await getUserFromSession();
+    const user = await getUserFromSession();
 
-  if (!user) {
-    redirect('/login');
-  }
-  // Check if the user has admin rights for any club
-  if (!user.isAdmin || !user.administeredClubIds || user.administeredClubIds.length === 0) {
-     redirect('/');
-  }
+    if (!user || !user.isAdmin || !user.administeredClubIds || user.administeredClubIds.length === 0) {
+        redirect('/');
+    }
+    
+    // For now, let's work with the first club the user administers.
+    const activeClubId = user.administeredClubIds[0];
+    const adminData = await getAdminPageData(activeClubId);
 
-  // For now, we manage the first club in the list. A future improvement would be a club selector.
-  const adminClubId = user.administeredClubIds[0];
+    if (!adminData) {
+        return (
+            <div className="flex h-full w-full items-center justify-center py-20">
+                <div className="flex flex-col items-center gap-4 text-center">
+                    <AlertTriangle className="h-12 w-12 text-destructive" />
+                    <h2 className="text-2xl font-bold">Error al Cargar Datos</h2>
+                    <p className="text-muted-foreground">No se pudieron cargar los datos de la asociación. Inténtalo de nuevo más tarde.</p>
+                </div>
+            </div>
+        );
+    }
+    
+    const { club, clubMembers, shiftRequests, definedMatches, matchAssignments } = adminData;
+    
+    const allRefereesInClub = clubMembers.filter(m => m.isReferee);
 
-  // Fetch admin data and suggestions in parallel for better performance
-  const adminDataPromise = getAdminPageData(adminClubId);
-  const suggestionsPromise = user.isDeveloper ? getSuggestions() : Promise.resolve([]);
-  
-  const [adminData, suggestions] = await Promise.all([adminDataPromise, suggestionsPromise]);
+    const suggestions = user.isDeveloper ? await getSuggestions() : [];
 
+    const tabs = [
+        { value: "dashboard", label: "Dashboard", icon: BarChart3 },
+        { value: "assignments", label: "Asignaciones", icon: ListOrdered },
+        { value: "define_matches", label: "Definir Partidos", icon: FilePlus2 },
+        { value: "info_members", label: "Info y Miembros", icon: Settings },
+    ];
+    
+    if (user.isDeveloper) {
+        tabs.push({ value: "suggestions", label: "Sugerencias", icon: MessageSquare });
+    }
 
-  if (!adminData) {
     return (
-     <div className="flex flex-col items-center justify-center h-64 text-center">
-       <ShieldAlert className="h-12 w-12 text-destructive mb-4" />
-       <p className="text-xl font-semibold">Error al cargar la asociación.</p>
-       <p className="text-muted-foreground">No se pudo encontrar la información para la asociación que administras.</p>
-     </div>
-   );
-  }
-
-  const { club, clubMembers, shiftRequests, definedMatches, matchAssignments } = adminData;
-  const refereesInClub = clubMembers.filter(m => m.roleInClub === 'referee');
-
-  return (
-    <div className="w-full space-y-6">
-      <Card className="shadow-lg">
-        <CardHeader>
-          <CardTitle className="text-3xl font-headline flex items-center gap-2">
-            Panel de Admin: {club.name}
-          </CardTitle>
-          <CardDescription>
-            Gestiona las postulaciones, los turnos asignados y define los partidos/turnos disponibles para tu asociación.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <Tabs defaultValue="dashboard" className="w-full relative">
-            <TabsList className="grid w-full grid-cols-1 md:grid-cols-3 lg:grid-cols-6 mb-24 md:mb-8 relative z-10 [transform:translateZ(0px)]">
-               <TabsTrigger value="dashboard">
-                <LayoutDashboard className="mr-2 h-4 w-4" /> Dashboard
-              </TabsTrigger>
-              <TabsTrigger value="assignments"> 
-                <ClipboardList className="mr-2 h-4 w-4" /> Gestionar Asignaciones
-              </TabsTrigger>
-              <TabsTrigger value="match-manager"> 
-                <CalendarPlus className="mr-2 h-4 w-4" /> Definir Partidos/Turnos
-              </TabsTrigger>
-              <TabsTrigger value="members">
-                <Users className="mr-2 h-4 w-4" /> Gestionar Miembros
-              </TabsTrigger>
-               <TabsTrigger value="club-info">
-                <Info className="mr-2 h-4 w-4" /> Info de la Asociación
-              </TabsTrigger>
-              {user.isDeveloper && (
-                <TabsTrigger value="suggestions">
-                  <MessageSquare className="mr-2 h-4 w-4" /> Sugerencias
-                </TabsTrigger>
-              )}
+        <Tabs defaultValue="dashboard" className="w-full">
+            <TabsList className="h-auto justify-start flex-wrap">
+                {tabs.map(tab => (
+                    <TabsTrigger key={tab.value} value={tab.value}>
+                        <tab.icon className="mr-2 h-4 w-4"/>
+                        {tab.label}
+                    </TabsTrigger>
+                ))}
             </TabsList>
-             <TabsContent value="dashboard" className="relative z-0">
-              <AdminDashboard 
-                shiftRequestsForClub={shiftRequests}
-                allRefereesInClub={refereesInClub}
-              />
-            </TabsContent>
-            <TabsContent value="assignments" className="relative z-0"> 
-              <ShiftTable 
-                clubId={club.id}
-                initialDefinedMatches={definedMatches}
-                initialShiftRequests={shiftRequests}
-                initialClubMembers={clubMembers}
-                initialMatchAssignments={matchAssignments}
-              />
-            </TabsContent>
-            <TabsContent value="match-manager" className="relative z-0"> 
-              <ClubMatchManager clubId={club.id} initialMatches={definedMatches} />
-            </TabsContent>
-            <TabsContent value="members" className="relative z-0">
-                <MembersManager 
-                    clubId={club.id}
-                    members={clubMembers}
-                    currentUserId={user.id}
-                />
-            </TabsContent>
-            <TabsContent value="club-info" className="relative z-0">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Información de tu Asociación</CardTitle>
-                  <CardDescription>Aquí puedes ver los detalles de tu asociación y compartir el código con tus árbitros.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <p><strong>Nombre de la Asociación:</strong> {club.name}</p>
-                  <div className="flex flex-wrap items-center gap-2">
-                    <strong>Código de la Asociación:</strong> 
-                    <span className="font-mono bg-muted px-2 py-1 rounded text-sm break-all">{club.id}</span>
-                    <CopyClubIdButton clubId={club.id} />
-                  </div>
-                  <p className="text-sm text-muted-foreground">
-                    Comparte este código con los árbitros que deseen unirse a tu asociación.
-                    Deberán ingresarlo durante el proceso de registro.
-                  </p>
-                </CardContent>
-              </Card>
-            </TabsContent>
-             {user.isDeveloper && (
-              <TabsContent value="suggestions" className="relative z-0">
-                  <SuggestionsView suggestions={suggestions} />
-              </TabsContent>
-            )}
-          </Tabs>
-        </CardContent>
-      </Card>
-    </div>
-  );
+            <div className="mt-6">
+                <TabsContent value="dashboard" className="mt-0">
+                     <AdminDashboard 
+                       allRefereesInClub={allRefereesInClub}
+                       shiftRequestsForClub={shiftRequests}
+                     />
+                </TabsContent>
+                <TabsContent value="assignments" className="mt-0">
+                    <ShiftTable
+                        clubId={club.id}
+                        clubName={club.name}
+                        initialDefinedMatches={definedMatches || []}
+                        initialShiftRequests={shiftRequests}
+                        initialClubMembers={clubMembers}
+                        initialMatchAssignments={matchAssignments || []}
+                    />
+                </TabsContent>
+                <TabsContent value="define_matches" className="mt-0">
+                     <ClubMatchManager 
+                        clubId={club.id}
+                        initialMatches={definedMatches || []}
+                    />
+                </TabsContent>
+                <TabsContent value="info_members" className="space-y-6 mt-0">
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2"><BadgeInfo size={22}/> Info de la Asociación</CardTitle>
+                            <CardDescription>Este es el código que debes compartir con los árbitros para que se unan a tu asociación.</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <div className="flex items-center space-x-2">
+                                <p className="text-sm font-semibold text-muted-foreground">Código:</p>
+                                <p className="font-mono text-sm p-2 bg-muted rounded-md">{club.id}</p>
+                                <CopyClubIdButton clubId={club.id} />
+                            </div>
+                        </CardContent>
+                    </Card>
+                    <MembersManager
+                        clubId={club.id}
+                        members={clubMembers}
+                        currentUserId={user.id}
+                    />
+                </TabsContent>
+                {user.isDeveloper && (
+                    <TabsContent value="suggestions" className="mt-0">
+                         <SuggestionsView suggestions={suggestions} />
+                    </TabsContent>
+                )}
+            </div>
+        </Tabs>
+    );
 }
