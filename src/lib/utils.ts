@@ -33,8 +33,8 @@ export const isMatchEditable = (matchDateStr: string, matchTimeStr: string): boo
     
     const hoursUntilMatch = differenceInHours(matchDateTime, now);
     
-    // Postulation is editable if the match is 24 hours or more away.
-    return hoursUntilMatch >= 24; 
+    // Postulation is editable if the match is 12 hours or more away.
+    return hoursUntilMatch >= 12; 
   } catch (e) {
     console.error("Error parsing match date/time for editability check:", matchDateStr, matchTimeStr, e);
     return false; // Safely default to not editable on error

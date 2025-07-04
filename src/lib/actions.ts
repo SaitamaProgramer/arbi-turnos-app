@@ -7,7 +7,7 @@ import type { Club, ClubSpecificMatch, MatchAssignment, RegisterUserPayload, Shi
 import { getUserFromSession, createSession, deleteSession, getFullUserFromDb } from './session';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
-import { isPostulationEditable, rowsToType } from './utils';
+import { isMatchEditable, isPostulationEditable, rowsToType } from './utils';
 import { createHmac, randomBytes } from 'crypto';
 import { isBefore, parseISO, startOfDay, formatISO } from 'date-fns';
 
@@ -472,6 +472,33 @@ export async function submitAvailability(payload: z.infer<typeof availabilitySch
             return { error: "Ya tienes una postulación pendiente para esta asociación. Por favor, edítala." };
         }
 
+        // --- NEW VALIDATION LOGIC ---
+        // Fetch all matches the user is trying to apply for
+        const matchesResult = await db.execute({
+            sql: `SELECT id, club_id, description, match_date as date, match_time as time, location, status FROM club_matches WHERE id IN (${selectedMatchIds.map(() => '?').join(',')})`,
+            args: [...selectedMatchIds]
+        });
+        const selectedMatchesData = rowsToType<ClubSpecificMatch>(matchesResult.rows);
+
+        // Ensure all provided match IDs were valid
+        if (selectedMatchesData.length !== selectedMatchIds.length) {
+            return { error: "Uno o más de los partidos seleccionados no existen." };
+        }
+
+        // A user submitting a new postulation has no assignments to check against for this postulation.
+        // We only need to check the time limit and status.
+        const allMatchesAreEditableByDate = selectedMatchesData.every(match => isMatchEditable(match.date, match.time));
+        if (!allMatchesAreEditableByDate) {
+            return { error: 'No se puede postular. El plazo para uno o más partidos ha vencido (menos de 12 horas restantes).' };
+        }
+
+        const allMatchesAreScheduled = selectedMatchesData.every(match => match.status === 'scheduled');
+        if (!allMatchesAreScheduled) {
+            return { error: 'Solo puedes postularte a partidos que estén en estado "Programado".' };
+        }
+        // --- END VALIDATION ---
+
+
         const requestId = `req_${randomBytes(6).toString('hex')}`;
         const submittedAt = new Date().toISOString();
 
@@ -505,7 +532,7 @@ export async function updateAvailability(requestId: string, payload: z.infer<typ
     if (!validation.success) {
         return { error: 'Datos de postulación inválidos.' };
     }
-    const { selectedMatchIds, hasCar, notes, selectedClubId } = validation.data;
+    const { selectedMatchIds, hasCar, notes } = validation.data;
     
     const user = await getUserFromSession();
     if (!user) {
@@ -523,30 +550,31 @@ export async function updateAvailability(requestId: string, payload: z.infer<typ
         if (!request) {
             return { error: 'Postulación no encontrada o no tienes permiso para editarla.' };
         }
-
-        const matchesInRequestResult = await db.execute({
-            sql: 'SELECT match_id FROM shift_request_matches WHERE request_id = ?',
-            args: [requestId]
+        
+        // --- NEW VALIDATION LOGIC ---
+        // Fetch all matches the user wants in their updated postulation
+        const newMatchesResult = await db.execute({
+            sql: `SELECT id, club_id, description, match_date as date, match_time as time, location, status FROM club_matches WHERE id IN (${selectedMatchIds.map(() => '?').join(',')})`,
+            args: [...selectedMatchIds]
         });
-        const matchIdsInRequest = matchesInRequestResult.rows.map(r => r.match_id as string);
+        const newSelectedMatchesData = rowsToType<ClubSpecificMatch>(newMatchesResult.rows);
 
-        if (matchIdsInRequest.length > 0) {
-            const matchesInRequestDataResult = await db.execute({
-                sql: `SELECT id, club_id, description, match_date as date, match_time as time, location, status FROM club_matches WHERE id IN (${matchIdsInRequest.map(() => '?').join(',')})`,
-                args: [...matchIdsInRequest]
-            });
-            const matchesInRequest = rowsToType<ClubSpecificMatch>(matchesInRequestDataResult.rows);
-
-            const assignmentsForUserResult = await db.execute({
-                sql: 'SELECT id, club_id, match_id, assigned_referee_id, assignment_role, assigned_at FROM match_assignments WHERE club_id = ? AND assigned_referee_id = ?',
-                args: [selectedClubId, userId]
-            });
-            const assignmentsForUser = rowsToType<MatchAssignment>(assignmentsForUserResult.rows);
-            
-            if (!isPostulationEditable(matchesInRequest, assignmentsForUser)) {
-                return { error: 'La postulación no es editable porque uno o más partidos están muy próximos o ya han sido asignados.' };
-            }
+        if (newSelectedMatchesData.length !== selectedMatchIds.length) {
+            return { error: "Uno o más de los partidos seleccionados no existen." };
         }
+        
+        // Fetch user's assignments in this club to see if they are locked out of editing
+        const assignmentsForUserResult = await db.execute({
+            sql: 'SELECT id, club_id, match_id, assigned_referee_id, assignment_role, assigned_at FROM match_assignments WHERE club_id = ? AND assigned_referee_id = ?',
+            args: [request.clubId, userId]
+        });
+        const assignmentsForUser = rowsToType<MatchAssignment>(assignmentsForUserResult.rows);
+
+        // Check if the new set of matches is valid given the user's assignments and the time limit
+        if (!isPostulationEditable(newSelectedMatchesData, assignmentsForUser)) {
+             return { error: 'La postulación no es editable porque uno o más partidos están muy próximos (menos de 12hs) o ya te han sido asignados.' };
+        }
+        // --- END VALIDATION ---
 
         const tx = await db.transaction('write');
         try {
