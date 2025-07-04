@@ -112,3 +112,20 @@ body {
 h1, h2, h3, h4, h5, h6 {
   @apply font-headline;
 }
+
+@layer utilities {
+  @media print {
+    body * {
+      visibility: hidden;
+    }
+    .printable-area, .printable-area * {
+      visibility: visible;
+    }
+    .printable-area {
+      width: 100%;
+    }
+    .no-print {
+      display: none !important;
+    }
+  }
+}

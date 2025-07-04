@@ -21,19 +21,17 @@ const schemaCreationCommands = [
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
     email TEXT NOT NULL UNIQUE,
-    password TEXT NOT NULL,
-    role TEXT NOT NULL CHECK(role IN ('admin', 'referee'))
+    password TEXT NOT NULL
   );`,
   `CREATE TABLE IF NOT EXISTS clubs (
     id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    admin_user_id TEXT NOT NULL,
-    FOREIGN KEY (admin_user_id) REFERENCES users(id) ON DELETE CASCADE
+    name TEXT NOT NULL
   );`,
   `CREATE TABLE IF NOT EXISTS user_clubs_membership (
     user_id TEXT NOT NULL,
     club_id TEXT NOT NULL,
-    PRIMARY KEY (user_id, club_id),
+    role_in_club TEXT NOT NULL CHECK(role_in_club IN ('admin', 'referee')) DEFAULT 'referee',
+    PRIMARY KEY (user_id, club_id, role_in_club),
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE
   );`,
@@ -68,12 +66,14 @@ const schemaCreationCommands = [
   `CREATE TABLE IF NOT EXISTS match_assignments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     club_id TEXT NOT NULL,
-    match_id TEXT NOT NULL UNIQUE,
+    match_id TEXT NOT NULL,
     assigned_referee_id TEXT NOT NULL,
+    assignment_role TEXT NOT NULL CHECK(assignment_role IN ('referee', 'assistant')) DEFAULT 'referee',
     assigned_at TEXT NOT NULL,
     FOREIGN KEY (club_id) REFERENCES clubs(id) ON DELETE CASCADE,
     FOREIGN KEY (match_id) REFERENCES club_matches(id) ON DELETE CASCADE,
-    FOREIGN KEY (assigned_referee_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (assigned_referee_id) REFERENCES users(id) ON DELETE CASCADE,
+    UNIQUE (match_id, assigned_referee_id)
   );`,
    `CREATE TABLE IF NOT EXISTS suggestions (
       id TEXT PRIMARY KEY,
@@ -88,15 +88,11 @@ const schemaCreationCommands = [
 
 export async function GET() {
   try {
-    console.log('Reiniciando la base de datos... Borrando tablas existentes.');
-    for (const command of schemaDestructionCommands) {
-      await db.execute(command);
-    }
+    console.log('Reiniciando la base de datos... Enviando comandos de borrado en lote.');
+    await db.batch(schemaDestructionCommands, 'write');
     
-    console.log('Creando nuevo esquema de base de datos...');
-    for (const command of schemaCreationCommands) {
-      await db.execute(command);
-    }
+    console.log('Creando nuevo esquema de base de datos... Enviando comandos de creación en lote.');
+    await db.batch(schemaCreationCommands, 'write');
 
     console.log('La base de datos se ha inicializado correctamente.');
     return NextResponse.json({ message: 'La base de datos se ha reiniciado y actualizado correctamente.' });

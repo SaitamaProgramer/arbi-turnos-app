@@ -1,7 +1,7 @@
 import { type ClassValue, clsx } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { parseISO, isBefore, startOfDay } from 'date-fns';
-import type { ClubSpecificMatch, MatchAssignment } from "./types";
+import { parseISO, isBefore, differenceInHours } from 'date-fns';
+import type { ClubSpecificMatch, MatchAssignment } from "@/types";
 
 
 export function cn(...inputs: ClassValue[]) {
@@ -21,23 +21,22 @@ export function rowsToType<T>(rows: any[]): T[] {
 }
 
 
-export const isMatchEditable = (matchDateStr: string): boolean => {
+export const isMatchEditable = (matchDateStr: string, matchTimeStr: string): boolean => {
   try {
-    // Dates from the database might not have a time component, so parseISO is robust
-    const today = startOfDay(new Date());
-    const mDate = startOfDay(parseISO(matchDateStr)); 
+    const now = new Date();
+    // The date from DB is like "2024-07-30" and time is "15:00"
+    // We need to construct a full ISO string like "2024-07-30T15:00:00"
+    const matchDateTime = parseISO(`${matchDateStr}T${matchTimeStr}:00`);
     
-    // Check if the match date is in the past
-    if (isBefore(mDate, today)) return false; 
+    // Check if the match is in the past
+    if (isBefore(matchDateTime, now)) return false; 
     
-    // Calculate the difference in days
-    const diffInDays = (mDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24);
+    const hoursUntilMatch = differenceInHours(matchDateTime, now);
     
-    // Postulation is editable if the match is more than 2 days away.
-    // i.e., 3 days away or more is editable. 2, 1, 0 days away is not.
-    return diffInDays > 2; 
+    // Postulation is editable if the match is 24 hours or more away.
+    return hoursUntilMatch >= 24; 
   } catch (e) {
-    console.error("Error parsing match date for editability check:", matchDateStr, e);
+    console.error("Error parsing match date/time for editability check:", matchDateStr, matchTimeStr, e);
     return false; // Safely default to not editable on error
   }
 };
@@ -45,7 +44,7 @@ export const isMatchEditable = (matchDateStr: string): boolean => {
 
 export const isPostulationEditable = (
     selectedMatches: ClubSpecificMatch[],
-    assignmentsForThisUserInThisClub: Omit<MatchAssignment, 'id'| 'clubId' | 'assignedAt'>[]
+    assignmentsForThisUserInThisClub: MatchAssignment[]
 ): boolean => {
   if (!selectedMatches || selectedMatches.length === 0) return true;
 
@@ -58,13 +57,10 @@ export const isPostulationEditable = (
   }
 
   // 2. Check date-based editability for all matches
-  const allMatchesEditableByDate = selectedMatches.every(match => isMatchEditable(match.date));
+  const allMatchesEditableByDate = selectedMatches.every(match => isMatchEditable(match.date, match.time));
   if (!allMatchesEditableByDate) {
     return false;
   }
   
   return true; // All checks passed
 };
-
-
-    

@@ -134,7 +134,7 @@ export default function RegisterPage() {
                           form.clearErrors("clubIdToJoin");
                         }}
                         defaultValue={field.value}
-                        className="flex flex-col space-y-2 sm:flex-row sm:space-x-4 sm:space-y-0"
+                        className="flex flex-col space-y-2 md:flex-row md:space-x-4 md:space-y-0"
                       >
                         <FormItem className="flex items-center space-x-3 space-y-0">
                           <FormControl>

@@ -17,10 +17,11 @@ export default async function UserPage() {
     redirect('/login');
   }
 
-  // Redirect admin users away from the referee-specific page
-  if (user.role === 'admin') {
-    redirect('/admin');
+  // If user has no memberships at all, they will see a specific message on the form.
+  if (!user.isReferee && !user.isAdmin) {
+     redirect('/register'); // Should not happen if logged in, but as a fallback.
   }
+
 
   const formData = await getAvailabilityFormData(user.id);
 

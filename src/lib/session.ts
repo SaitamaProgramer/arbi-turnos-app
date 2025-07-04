@@ -79,28 +79,38 @@ export async function getUserFromSession(): Promise<User | null> {
 export async function getFullUserFromDb(userId: string): Promise<User | null> {
      try {
         const userResult = await db.execute({
-            sql: `
-                SELECT u.id, u.name, u.email, u.role, c.id as administered_club_id
-                FROM users u
-                LEFT JOIN clubs c ON u.id = c.admin_user_id
-                WHERE u.id = ?
-            `,
+            sql: 'SELECT id, name, email FROM users WHERE id = ?',
             args: [userId]
         });
         
         if (userResult.rows.length === 0) return null;
+        
         const user = rowsToType<User>(userResult.rows)[0];
         
-        if (user.role === 'referee') {
-            const memberClubsResult = await db.execute({
-                sql: 'SELECT club_id FROM user_clubs_membership WHERE user_id = ?',
-                args: [user.id]
-            });
-            user.memberClubIds = memberClubsResult.rows.map(mc => mc.club_id as string);
+        const membershipsResult = await db.execute({
+            sql: 'SELECT club_id, role_in_club FROM user_clubs_membership WHERE user_id = ?',
+            args: [user.id]
+        });
+        
+        user.memberClubIds = [];
+        user.administeredClubIds = [];
+        user.isAdmin = false;
+        user.isReferee = false;
+
+        for (const row of membershipsResult.rows) {
+            const membership = rowsToType<{clubId: string, roleInClub: 'admin' | 'referee'}>([row])[0];
+            user.memberClubIds.push(membership.clubId);
+            if (membership.roleInClub === 'admin') {
+                user.administeredClubIds.push(membership.clubId);
+                user.isAdmin = true;
+            }
+            if (membership.roleInClub === 'referee') {
+                user.isReferee = true;
+            }
         }
 
         // Add the isDeveloper flag based on the environment variable
-        if (user.role === 'admin' && process.env.DEVELOPER_EMAIL) {
+        if (user.isAdmin && process.env.DEVELOPER_EMAIL) {
             user.isDeveloper = user.email === process.env.DEVELOPER_EMAIL;
         }
 

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -43,7 +42,7 @@ interface AvailabilityEditorProps {
   clubId: string;
   clubName: string;
   matches: ClubSpecificMatch[];
-  assignments: Omit<MatchAssignment, 'id' | 'clubId' | 'assignedAt'>[];
+  assignments: MatchAssignment[];
   postulation: ShiftRequestWithMatches | null;
   canEdit: boolean;
 }
@@ -72,7 +71,7 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
   useEffect(() => {
     const nonEditableIds = new Set<string>();
     matchesForForm.forEach(match => {
-        if (!isMatchEditable(match.date)) {
+        if (!isMatchEditable(match.date, match.time)) {
             nonEditableIds.add(match.id);
         }
     });
@@ -168,7 +167,8 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
                       render={({ field }) => {
                         const isChecked = field.value?.includes(match.id);
                         const isThisMatchActuallyEditableByDate = !nonEditableByDateMatchIds.has(match.id);
-                        const isThisMatchAssignedToCurrentUser = assignments.some(asg => asg.matchId === match.id);
+                        const assignment = assignments.find(asg => asg.matchId === match.id);
+                        const isThisMatchAssignedToCurrentUser = !!assignment;
                         
                         const canBeSelected = match.status === 'scheduled' && isThisMatchActuallyEditableByDate && !isThisMatchAssignedToCurrentUser;
                         const disableCheckbox = isPending || !canEdit || (!isChecked && !canBeSelected);
@@ -198,7 +198,7 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
                             <div className="flex-1">
                                <FormLabel className={cn("font-normal text-sm flex items-center gap-2", (disableCheckbox && !isChecked) && "text-muted-foreground/70")}>
                                 {match.description}
-                                {isThisMatchAssignedToCurrentUser && <Badge variant="default" className="bg-green-500 hover:bg-green-500 text-white text-[10px] px-1.5 py-0.5"><BadgeCheck size={12} className="mr-1"/>Asignado a ti</Badge>}
+                                {isThisMatchAssignedToCurrentUser && <Badge variant="default" className="bg-green-500 hover:bg-green-500 text-white text-[10px] px-1.5 py-0.5"><BadgeCheck size={12} className="mr-1"/>Asignado: {assignment.assignmentRole === 'referee' ? 'Árbitro' : 'Asistente'}</Badge>}
                                 {match.status === 'cancelled' && <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5"><Ban size={12} className="mr-1"/>Cancelado</Badge>}
                                 {match.status === 'postponed' && <Badge variant="outline" className="text-yellow-600 border-yellow-500 text-[10px] px-1.5 py-0.5"><Clock size={12} className="mr-1"/>Pospuesto</Badge>}
                               </FormLabel>

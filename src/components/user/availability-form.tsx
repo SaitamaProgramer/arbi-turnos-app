@@ -50,7 +50,7 @@ function JoinClubForm() {
   return (
     <div className="mt-4 p-4 border rounded-lg bg-muted/30">
         <h3 className="text-sm font-semibold mb-2 flex items-center gap-1"><PlusCircle className="text-primary"/> Unirse a otra Asociación</h3>
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col md:flex-row gap-2">
             <Input
                 placeholder="Ingresa el código de la asociación"
                 value={newClubCode}
@@ -60,7 +60,7 @@ function JoinClubForm() {
             <Button
                 onClick={handleJoinClub}
                 disabled={isPending || !newClubCode.trim()}
-                className="w-full sm:w-auto"
+                className="w-full md:w-auto"
             >
                 {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
                 Unirse
