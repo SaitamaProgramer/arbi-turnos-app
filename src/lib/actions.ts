@@ -178,7 +178,7 @@ export async function getAdminPageData(clubId: string) {
             definedMatchesResult,
             matchAssignmentsResult,
         ] = await Promise.all([
-            db.execute({ sql: 'SELECT * FROM clubs WHERE id = ?', args: [clubId] }),
+            db.execute({ sql: 'SELECT id, name, postulation_mode FROM clubs WHERE id = ?', args: [clubId] }),
             db.execute({
                 sql: `
                     SELECT u.id, u.name, u.email 
@@ -369,10 +369,10 @@ export async function getAvailabilityFormData(userId: string) {
         if (memberClubIds.length === 0) return null;
 
         const clubsResult = await db.execute({
-            sql: `SELECT id, name FROM clubs WHERE id IN (${memberClubIds.map(() => '?').join(',')})`,
+            sql: `SELECT id, name, postulation_mode FROM clubs WHERE id IN (${memberClubIds.map(() => '?').join(',')})`,
             args: [...memberClubIds]
         });
-        const clubs = rowsToType<{id: string, name: string}>(clubsResult.rows);
+        const clubs = rowsToType<Club>(clubsResult.rows);
         
         const data: any = {
             activeClubId: memberClubIds[0],
@@ -423,6 +423,7 @@ export async function getAvailabilityFormData(userId: string) {
                     matches,
                     assignments,
                     postulation: postulationWithMatches,
+                    postulationMode: club.postulationMode,
                 }
             };
         });
@@ -976,5 +977,28 @@ export async function deleteMemberFromClub(clubId: string, userIdToDelete: strin
         await tx.rollback();
         console.error(`Error deleting member:`, e.message);
         return { success: false, error: "No se pudo eliminar al miembro. Ocurrió un error en la base de datos." };
+    }
+}
+
+export async function updateClubSettings(clubId: string, settings: { postulationMode: 'individual' | 'by_day' }) {
+    const user = await getUserFromSession();
+    if (!user || !user.isAdmin || !user.administeredClubIds?.includes(clubId)) {
+        return { success: false, error: 'No tienes permiso para realizar esta acción.' };
+    }
+
+    const { postulationMode } = settings;
+    if (!['individual', 'by_day'].includes(postulationMode)) {
+        return { success: false, error: 'Modo de postulación no válido.' };
+    }
+
+    try {
+        await db.execute({
+            sql: `UPDATE clubs SET postulation_mode = ? WHERE id = ?`,
+            args: [postulationMode, clubId]
+        });
+        return { success: true };
+    } catch (e: any) {
+        console.error(`Error updating club settings:`, e.message);
+        return { success: false, error: "No se pudo guardar la configuración." };
     }
 }

@@ -25,7 +25,8 @@ const schemaCreationCommands = [
   );`,
   `CREATE TABLE IF NOT EXISTS clubs (
     id TEXT PRIMARY KEY,
-    name TEXT NOT NULL
+    name TEXT NOT NULL,
+    postulation_mode TEXT NOT NULL DEFAULT 'individual' CHECK(postulation_mode IN ('individual', 'by_day'))
   );`,
   `CREATE TABLE IF NOT EXISTS user_clubs_membership (
     user_id TEXT NOT NULL,

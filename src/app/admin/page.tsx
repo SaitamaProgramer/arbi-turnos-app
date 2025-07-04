@@ -8,8 +8,9 @@ import AdminDashboard from "@/components/admin/admin-dashboard";
 import ShiftTable from "@/components/admin/shift-table";
 import ClubMatchManager from "@/components/admin/form-config-editor";
 import MembersManager from "@/components/admin/members-manager";
+import ClubSettingsManager from "@/components/admin/club-settings-manager";
 import SuggestionsView from "@/components/admin/suggestions-view";
-import { AlertTriangle, BadgeInfo, BarChart3, FilePlus2, ListOrdered, Settings, MessageSquare } from "lucide-react";
+import { AlertTriangle, BadgeInfo, BarChart3, FilePlus2, ListOrdered, Settings, Users, MessageSquare } from "lucide-react";
 import CopyClubIdButton from "@/components/admin/copy-club-id-button";
 import type { Metadata } from 'next';
 
@@ -43,7 +44,7 @@ export default async function AdminPage() {
     
     const { club, clubMembers, shiftRequests, definedMatches, matchAssignments } = adminData;
     
-    const allRefereesInClub = clubMembers.filter(m => m.isReferee);
+    const allRefereesInClub = Array.isArray(clubMembers) ? clubMembers.filter(m => m.isReferee) : [];
 
     const suggestions = user.isDeveloper ? await getSuggestions() : [];
 
@@ -51,7 +52,8 @@ export default async function AdminPage() {
         { value: "dashboard", label: "Dashboard", icon: BarChart3 },
         { value: "assignments", label: "Asignaciones", icon: ListOrdered },
         { value: "define_matches", label: "Definir Partidos", icon: FilePlus2 },
-        { value: "info_members", label: "Info y Miembros", icon: Settings },
+        { value: "members", label: "Miembros", icon: Users },
+        { value: "config", label: "Configuración", icon: Settings },
     ];
     
     if (user.isDeveloper) {
@@ -72,7 +74,7 @@ export default async function AdminPage() {
                 <TabsContent value="dashboard" className="mt-0">
                      <AdminDashboard 
                        allRefereesInClub={allRefereesInClub}
-                       shiftRequestsForClub={shiftRequests}
+                       shiftRequestsForClub={Array.isArray(shiftRequests) ? shiftRequests : []}
                      />
                 </TabsContent>
                 <TabsContent value="assignments" className="mt-0">
@@ -80,8 +82,8 @@ export default async function AdminPage() {
                         clubId={club.id}
                         clubName={club.name}
                         initialDefinedMatches={definedMatches || []}
-                        initialShiftRequests={shiftRequests}
-                        initialClubMembers={clubMembers}
+                        initialShiftRequests={shiftRequests || []}
+                        initialClubMembers={clubMembers || []}
                         initialMatchAssignments={matchAssignments || []}
                     />
                 </TabsContent>
@@ -91,11 +93,18 @@ export default async function AdminPage() {
                         initialMatches={definedMatches || []}
                     />
                 </TabsContent>
-                <TabsContent value="info_members" className="space-y-6 mt-0">
+                <TabsContent value="members" className="mt-0">
+                    <MembersManager
+                        clubId={club.id}
+                        members={clubMembers || []}
+                        currentUserId={user.id}
+                    />
+                </TabsContent>
+                 <TabsContent value="config" className="space-y-6 mt-0">
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2"><BadgeInfo size={22}/> Info de la Asociación</CardTitle>
-                            <CardDescription>Este es el código que debes compartir con los árbitros para que se unan a tu asociación.</CardDescription>
+                            <CardTitle className="flex items-center gap-2"><BadgeInfo size={22}/> Código de la Asociación</CardTitle>
+                            <CardDescription>Comparte este código con los árbitros para que se unan a tu asociación.</CardDescription>
                         </CardHeader>
                         <CardContent>
                             <div className="flex items-center space-x-2">
@@ -105,11 +114,7 @@ export default async function AdminPage() {
                             </div>
                         </CardContent>
                     </Card>
-                    <MembersManager
-                        clubId={club.id}
-                        members={clubMembers}
-                        currentUserId={user.id}
-                    />
+                    <ClubSettingsManager club={club} />
                 </TabsContent>
                 {user.isDeveloper && (
                     <TabsContent value="suggestions" className="mt-0">

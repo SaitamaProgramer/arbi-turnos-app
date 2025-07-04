@@ -187,6 +187,7 @@ export default function AvailabilityForm({ initialData, user }: AvailabilityForm
                 assignments={activeClubData.assignments}
                 postulation={activeClubData.postulation}
                 canEdit={canEditCurrentPostulation}
+                postulationMode={activeClubData.postulationMode}
               />
             )}
           </div>

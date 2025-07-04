@@ -1,3 +1,4 @@
+
 'use client';
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -19,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { isMatchEditable } from "@/lib/utils";
 import type { ClubSpecificMatch, MatchAssignment, ShiftRequestWithMatches } from "@/types";
-import { ListChecks, Car, ClipboardList, Send, Loader2, AlertTriangle, Edit3, Info, Ban, Clock, BadgeCheck } from "lucide-react";
+import { ListChecks, Car, ClipboardList, Send, Loader2, AlertTriangle, Edit3, Info, Ban, Clock, BadgeCheck, ListTree } from "lucide-react";
 import { useTransition, useMemo, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { format, parseISO, isBefore, startOfDay } from 'date-fns';
@@ -45,9 +46,10 @@ interface AvailabilityEditorProps {
   assignments: MatchAssignment[];
   postulation: ShiftRequestWithMatches | null;
   canEdit: boolean;
+  postulationMode: 'individual' | 'by_day';
 }
 
-export default function AvailabilityEditor({ clubId, clubName, matches, assignments, postulation, canEdit }: AvailabilityEditorProps) {
+export default function AvailabilityEditor({ clubId, clubName, matches, assignments, postulation, canEdit, postulationMode }: AvailabilityEditorProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
@@ -78,7 +80,6 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
     setNonEditableByDateMatchIds(nonEditableIds);
   }, [matchesForForm]);
 
-
   const form = useForm<AvailabilityFormValues>({
     resolver: zodResolver(availabilityFormSchema),
     defaultValues: {
@@ -88,6 +89,21 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
       selectedClubId: clubId,
     },
   });
+
+  const { setValue, getValues } = form;
+
+  const groupedMatches = useMemo(() => {
+    if (postulationMode !== 'by_day') return {};
+    return matchesForForm.reduce((acc: Record<string, ClubSpecificMatch[]>, match) => {
+        const dateKey = format(parseISO(match.date), "EEEE, dd 'de' MMMM", { locale: es });
+        if (!acc[dateKey]) {
+            acc[dateKey] = [];
+        }
+        acc[dateKey].push(match);
+        return acc;
+    }, {});
+  }, [matchesForForm, postulationMode]);
+
 
   async function onSubmit(data: AvailabilityFormValues) {
     startTransition(async () => {
@@ -125,7 +141,7 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
       <div className="text-center py-6">
         <AlertTriangle className="mx-auto h-10 w-10 text-yellow-500 mb-3" />
         <p className="text-lg font-semibold text-muted-foreground mb-1">
-          No hay Partidos Disponibles para {clubName}
+          No hay Partidos disponibles para <span className="text-primary font-bold">{clubName}</span>
         </p>
         <p className="text-xs text-muted-foreground">
           El administrador de la asociación no ha definido partidos futuros programados.
@@ -153,19 +169,22 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
           <FormField
             control={form.control}
             name="selectedMatchIds"
-            render={() => (
+            render={({ field }) => (
               <FormItem>
                 <div className="mb-4">
-                  <FormLabel className="text-base flex items-center gap-2"><ListChecks className="text-primary" />Partidos/Turnos Disponibles</FormLabel>
+                  <FormLabel className="text-base flex items-center gap-2">
+                    {postulationMode === 'by_day' ? <ListTree className="text-primary"/> : <ListChecks className="text-primary"/>}
+                    {postulationMode === 'by_day' ? 'Días Disponibles' : 'Partidos/Turnos Disponibles'}
+                  </FormLabel>
                 </div>
                 <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
-                  {matchesForForm.map((match) => (
+                  {postulationMode === 'individual' && matchesForForm.map((match) => (
                     <FormField
                       key={match.id}
                       control={form.control}
                       name="selectedMatchIds"
-                      render={({ field }) => {
-                        const isChecked = field.value?.includes(match.id);
+                      render={({ field: individualField }) => {
+                        const isChecked = individualField.value?.includes(match.id);
                         const isThisMatchActuallyEditableByDate = !nonEditableByDateMatchIds.has(match.id);
                         const assignment = assignments.find(asg => asg.matchId === match.id);
                         const isThisMatchAssignedToCurrentUser = !!assignment;
@@ -189,8 +208,8 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
                                 onCheckedChange={(checked) => {
                                   if (disableCheckbox) return;
                                   return checked
-                                    ? field.onChange([...(field.value || []), match.id])
-                                    : field.onChange((field.value || []).filter((id) => id !== match.id));
+                                    ? individualField.onChange([...(individualField.value || []), match.id])
+                                    : individualField.onChange((individualField.value || []).filter((id) => id !== match.id));
                                 }}
                                 disabled={disableCheckbox}
                               />
@@ -212,6 +231,54 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
                       }}
                     />
                   ))}
+                  
+                  {postulationMode === 'by_day' && Object.entries(groupedMatches).map(([dateKey, matchesInDay]) => {
+                      const allMatchIdsInDay = matchesInDay.map(m => m.id);
+                      const selectedIdsInForm = getValues("selectedMatchIds") || [];
+                      
+                      const editableMatchIdsInDay = matchesInDay
+                        .filter(match => {
+                            const isThisMatchActuallyEditableByDate = !nonEditableByDateMatchIds.has(match.id);
+                            const assignment = assignments.find(asg => asg.matchId === match.id);
+                            const isThisMatchAssignedToCurrentUser = !!assignment;
+                            return match.status === 'scheduled' && isThisMatchActuallyEditableByDate && !isThisMatchAssignedToCurrentUser;
+                        }).map(m => m.id);
+
+                      const isDaySelected = editableMatchIdsInDay.length > 0 && editableMatchIdsInDay.every(id => selectedIdsInForm.includes(id));
+                      const disableDayCheckbox = isPending || !canEdit || editableMatchIdsInDay.length === 0;
+
+                      return (
+                        <div key={dateKey} className={cn("p-3 bg-muted/30 rounded-md border", disableDayCheckbox && "opacity-70")}>
+                          <div className="flex flex-row items-center space-x-3 space-y-0">
+                            <Checkbox
+                              checked={isDaySelected}
+                              disabled={disableDayCheckbox}
+                              onCheckedChange={(checked) => {
+                                const currentSelected = getValues("selectedMatchIds") || [];
+                                if (checked) {
+                                  const newSelected = [...new Set([...currentSelected, ...editableMatchIdsInDay])];
+                                  setValue("selectedMatchIds", newSelected, { shouldValidate: true });
+                                } else {
+                                  const newSelected = currentSelected.filter(id => !allMatchIdsInDay.includes(id));
+                                  setValue("selectedMatchIds", newSelected, { shouldValidate: true });
+                                }
+                              }}
+                            />
+                            <FormLabel className={cn("font-semibold text-sm capitalize", disableDayCheckbox && "cursor-not-allowed")}>{dateKey}</FormLabel>
+                          </div>
+                          <ul className="mt-2 pl-8 space-y-1 text-xs text-muted-foreground list-disc list-inside">
+                            {matchesInDay.map(match => (
+                              <li key={match.id}>{match.description} ({match.time} hs)
+                               { nonEditableByDateMatchIds.has(match.id) && <span className="text-red-500 italic ml-1">(Plazo vencido)</span> }
+                               { assignments.some(a=> a.matchId === match.id) && <span className="text-green-600 italic ml-1">(Ya asignado)</span> }
+                               { match.status !== 'scheduled' && <span className="text-yellow-600 italic ml-1">({match.status})</span> }
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      );
+                    })}
+
                 </div>
                 <FormMessage />
               </FormItem>

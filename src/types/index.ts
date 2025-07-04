@@ -28,6 +28,7 @@ export interface ShiftRequestWithMatches extends ShiftRequest {
 export interface Club {
   id: string; 
   name: string;
+  postulationMode: 'individual' | 'by_day';
 }
 
 export interface User {
@@ -70,6 +71,7 @@ export interface AvailabilityFormData {
       matches: ClubSpecificMatch[];
       assignments: MatchAssignment[]; // Assignments for the current user in this club
       postulation: ShiftRequestWithMatches | null; // Pending postulation for the current user in this club
+      postulationMode: 'individual' | 'by_day';
     }
   }
 }
