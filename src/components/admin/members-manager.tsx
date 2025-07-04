@@ -3,7 +3,7 @@
 
 import { useState, useTransition } from "react";
 import type { User } from "@/types";
-import { promoteUserToAdmin, demoteAdminToReferee } from "@/lib/actions";
+import { promoteUserToAdmin, demoteAdminToReferee, deleteMemberFromClub } from "@/lib/actions";
 import { useToast } from "@/hooks/use-toast";
 import { useRouter } from "next/navigation";
 import {
@@ -28,7 +28,7 @@ import {
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, ArrowUpCircle, ArrowDownCircle, ShieldCheck, User as UserIcon } from "lucide-react";
+import { Loader2, ArrowUpCircle, ArrowDownCircle, ShieldCheck, User as UserIcon, Trash2 } from "lucide-react";
 
 interface MembersManagerProps {
   clubId: string;
@@ -62,6 +62,26 @@ export default function MembersManager({ clubId, members, currentUserId }: Membe
             }
         });
     };
+    
+    const handleDeleteMember = async (userIdToDelete: string) => {
+      startTransition(async () => {
+        const result = await deleteMemberFromClub(clubId, userIdToDelete);
+        if (result.success) {
+          toast({
+            title: "Miembro Eliminado",
+            description: "El miembro ha sido eliminado de la asociación.",
+            variant: "success"
+          });
+          router.refresh();
+        } else {
+          toast({
+            title: "Error al Eliminar",
+            description: result.error,
+            variant: "destructive"
+          });
+        }
+      });
+    };
 
     const ActionButtonDialog = ({ member }: { member: User }) => (
       <AlertDialog>
@@ -71,7 +91,7 @@ export default function MembersManager({ clubId, members, currentUserId }: Membe
               <ArrowUpCircle className="mr-2 h-4 w-4"/> Promover a Admin
             </Button>
           ) : (
-            <Button variant="destructive" size="sm" disabled={isPending} className="w-full">
+            <Button variant="outline" size="sm" disabled={isPending} className="w-full">
               <ArrowDownCircle className="mr-2 h-4 w-4"/> Revocar Admin
             </Button>
           )}
@@ -90,7 +110,6 @@ export default function MembersManager({ clubId, members, currentUserId }: Membe
             <AlertDialogAction
               onClick={() => handleRoleChange(member.id, member.roleInClub === 'referee' ? 'admin' : 'referee')}
               disabled={isPending}
-              className={member.roleInClub === 'admin' ? 'bg-destructive hover:bg-destructive/90' : ''}
             >
               {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
               Confirmar
@@ -100,12 +119,39 @@ export default function MembersManager({ clubId, members, currentUserId }: Membe
       </AlertDialog>
     );
 
+    const DeleteMemberDialog = ({ member }: { member: User }) => (
+      <AlertDialog>
+          <AlertDialogTrigger asChild>
+              <Button variant="destructive" size="sm" disabled={isPending} className="w-full">
+                  <Trash2 className="mr-2 h-4 w-4" /> Eliminar
+              </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>¿Confirmas la eliminación?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      Esta acción es irreversible. Estás a punto de eliminar a <strong>{member.name}</strong> de tu asociación. 
+                      Se borrarán todas sus postulaciones y asignaciones.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel disabled={isPending}>Cancelar</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => handleDeleteMember(member.id)} disabled={isPending} className="bg-destructive hover:bg-destructive/90">
+                      {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Sí, eliminar miembro
+                  </AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
+  );
+
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>Gestionar Miembros de la Asociación</CardTitle>
         <CardDescription>
-          Promueve árbitros al rol de administrador para que puedan ayudarte a gestionar la asociación, o revoca sus permisos.
+          Promueve árbitros a administradores, revoca permisos o elimina miembros de la asociación.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -130,11 +176,14 @@ export default function MembersManager({ clubId, members, currentUserId }: Membe
                     </Badge>
                 )}
               </div>
-              <div className="mt-4 pt-3 border-t border-dashed flex justify-end">
+              <div className="mt-4 pt-3 border-t border-dashed flex flex-col sm:flex-row gap-2">
                 {member.id !== currentUserId ? (
-                  <ActionButtonDialog member={member} />
+                  <>
+                    <ActionButtonDialog member={member} />
+                    <DeleteMemberDialog member={member} />
+                  </>
                 ) : (
-                  <span className="text-xs text-muted-foreground italic"> (Tú) </span>
+                  <span className="text-xs text-muted-foreground italic w-full text-center sm:text-right"> (Tú) </span>
                 )}
               </div>
             </div>
@@ -149,7 +198,7 @@ export default function MembersManager({ clubId, members, currentUserId }: Membe
                 <TableHead>Nombre</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Rol Actual</TableHead>
-                <TableHead className="text-right">Acción</TableHead>
+                <TableHead className="text-right">Acciones</TableHead>
                 </TableRow>
             </TableHeader>
             <TableBody>
@@ -171,11 +220,16 @@ export default function MembersManager({ clubId, members, currentUserId }: Membe
                         )}
                     </TableCell>
                     <TableCell className="text-right">
-                    {member.id !== currentUserId ? (
-                      <ActionButtonDialog member={member} />
-                    ) : (
-                      <span className="text-xs text-muted-foreground italic"> (Tú) </span>
-                    )}
+                      <div className="flex gap-2 justify-end">
+                        {member.id !== currentUserId ? (
+                          <>
+                            <ActionButtonDialog member={member} />
+                            <DeleteMemberDialog member={member} />
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic px-3 py-1.5"> (Tú) </span>
+                        )}
+                      </div>
                     </TableCell>
                 </TableRow>
                 ))}

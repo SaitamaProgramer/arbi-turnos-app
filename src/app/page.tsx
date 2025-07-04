@@ -17,11 +17,8 @@ export default async function UserPage() {
     redirect('/login');
   }
 
-  // If user has no memberships at all, they will see a specific message on the form.
-  if (!user.isReferee && !user.isAdmin) {
-     redirect('/register'); // Should not happen if logged in, but as a fallback.
-  }
-
+  // The form itself will handle the case where a user has no memberships.
+  // No need to redirect them away from their main page.
 
   const formData = await getAvailabilityFormData(user.id);
 
