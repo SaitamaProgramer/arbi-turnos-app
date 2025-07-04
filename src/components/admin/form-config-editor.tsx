@@ -1,3 +1,4 @@
+
 "use client";
 
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -152,7 +153,7 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
         </CardTitle>
         <CardDescription>
           Crea, edita o elimina los partidos. Puedes marcar un partido como cancelado o pospuesto. 
-          Los partidos pasados pueden ser reutilizados para crear nuevos rápidamente.
+          Cualquier partido puede ser reutilizado para crear nuevos rápidamente.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -173,7 +174,6 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
                           {isPast && <Badge variant="outline" className="border-muted-foreground text-muted-foreground font-normal text-xs">Pasado</Badge>}
                         </FormLabel>
                         <div className="flex items-center gap-2">
-                          {isPast && (
                             <Button
                                 type="button"
                                 variant="secondary"
@@ -184,7 +184,6 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
                                 <CopyPlus size={14} className="mr-1" />
                                 Reutilizar
                             </Button>
-                          )}
                           <FormField
                             control={form.control}
                             name={`matches.${index}.status`}
@@ -216,7 +215,6 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
                               size="icon"
                               onClick={() => remove(index)}
                               aria-label="Eliminar partido"
-                              disabled={!isEditable}
                           >
                               <Trash2 size={18} />
                           </Button>

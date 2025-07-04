@@ -1,4 +1,5 @@
 
+
 export interface ClubSpecificMatch {
   id: string;
   clubId: string;
@@ -81,9 +82,17 @@ export interface Suggestion {
   submittedAt: string;
 }
 
+export interface UserStatMatch {
+  description: string;
+  date: string;
+  clubName: string;
+}
+
 export interface UserStats {
   associationsCount: number;
   refereedMatchesCount: number;
   cancelledMatchesCount: number;
   postulationsCount: number;
+  refereedMatches: UserStatMatch[];
+  cancelledMatches: UserStatMatch[];
 }

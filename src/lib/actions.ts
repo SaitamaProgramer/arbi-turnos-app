@@ -3,7 +3,7 @@
 import 'server-only';
 
 import { db } from './db';
-import type { Club, ClubSpecificMatch, MatchAssignment, RegisterUserPayload, ShiftRequest, ShiftRequestWithMatches, Suggestion, User, UserStats } from '@/types';
+import type { Club, ClubSpecificMatch, MatchAssignment, RegisterUserPayload, ShiftRequest, ShiftRequestWithMatches, Suggestion, User, UserStatMatch, UserStats } from '@/types';
 import { getUserFromSession, createSession, deleteSession, getFullUserFromDb } from './session';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
@@ -779,10 +779,12 @@ export async function getAccountPageData(userId: string): Promise<{ user: User, 
         });
 
         const assignedMatchesPromise = db.execute({
-            sql: `SELECT m.status, m.match_date 
+            sql: `SELECT m.status, m.match_date, m.description, c.name as club_name
                   FROM match_assignments as a
                   JOIN club_matches as m ON a.match_id = m.id
-                  WHERE a.assigned_referee_id = ?`,
+                  JOIN clubs as c on m.club_id = c.id
+                  WHERE a.assigned_referee_id = ?
+                  ORDER BY m.match_date DESC`,
             args: [userId]
         });
 
@@ -797,25 +799,33 @@ export async function getAccountPageData(userId: string): Promise<{ user: User, 
             postulationsPromise
         ]);
 
-        const assignedMatches = rowsToType<{status: 'scheduled' | 'cancelled' | 'postponed', matchDate: string}>(assignedMatchesResult.rows);
-
-        let refereedMatchesCount = 0;
-        let cancelledMatchesCount = 0;
+        const assignedMatches = rowsToType<{status: 'scheduled' | 'cancelled' | 'postponed', matchDate: string, description: string, clubName: string}>(assignedMatchesResult.rows);
+        
+        const refereedMatches: UserStatMatch[] = [];
+        const cancelledMatches: UserStatMatch[] = [];
         const today = startOfDay(new Date());
 
         assignedMatches.forEach(match => {
+            const statMatch: UserStatMatch = {
+                description: match.description,
+                date: match.matchDate,
+                clubName: match.clubName,
+            };
+
             if (match.status === 'cancelled') {
-                cancelledMatchesCount++;
+                cancelledMatches.push(statMatch);
             } else if (match.status === 'scheduled' && isBefore(parseISO(match.matchDate), today)) {
-                refereedMatchesCount++;
+                refereedMatches.push(statMatch);
             }
         });
 
         const stats: UserStats = {
             associationsCount: Number(associationsResult.rows[0]?.count ?? 0),
-            refereedMatchesCount: refereedMatchesCount,
-            cancelledMatchesCount: cancelledMatchesCount,
-            postulationsCount: Number(postulationsResult.rows[0]?.count ?? 0)
+            refereedMatchesCount: refereedMatches.length,
+            cancelledMatchesCount: cancelledMatches.length,
+            postulationsCount: Number(postulationsResult.rows[0]?.count ?? 0),
+            refereedMatches,
+            cancelledMatches,
         };
         
         // Return a fresh user object to ensure data consistency
@@ -829,7 +839,7 @@ export async function getAccountPageData(userId: string): Promise<{ user: User, 
         const user = await getFullUserFromDb(userId);
         if (!user) throw new Error("Fallo crítico al buscar usuario.");
 
-        return { user, stats: { associationsCount: 0, refereedMatchesCount: 0, cancelledMatchesCount: 0, postulationsCount: 0 }};
+        return { user, stats: { associationsCount: 0, refereedMatchesCount: 0, cancelledMatchesCount: 0, postulationsCount: 0, refereedMatches: [], cancelledMatches: [] }};
     }
 }
 
@@ -880,5 +890,63 @@ export async function demoteAdminToReferee(clubId: string, userIdToDemote: strin
     } catch (e: any) {
         console.error(`Error demoting admin:`, e.message);
         return { success: false, error: "No se pudo actualizar el rol del miembro." };
+    }
+}
+
+export async function deleteMemberFromClub(clubId: string, userIdToDelete: string) {
+    const user = await getUserFromSession();
+    if (!user || !user.isAdmin || !user.administeredClubIds?.includes(clubId)) {
+        return { success: false, error: "No tienes permiso para realizar esta acción." };
+    }
+
+    if (user.id === userIdToDelete) {
+        return { success: false, error: "No puedes eliminarte a ti mismo de la asociación." };
+    }
+    
+    const tx = await db.transaction('write');
+    try {
+        // Safety check: ensure we are not deleting the last admin
+        const memberRolesResult = await tx.execute({
+            sql: `SELECT role_in_club FROM user_clubs_membership WHERE user_id = ? AND club_id = ?`,
+            args: [userIdToDelete, clubId]
+        });
+        const isMemberAdmin = memberRolesResult.rows.some(r => r.role_in_club === 'admin');
+        
+        if (isMemberAdmin) {
+            const adminCountResult = await tx.execute({
+                sql: `SELECT COUNT(user_id) as count FROM user_clubs_membership WHERE club_id = ? AND role_in_club = 'admin'`,
+                args: [clubId]
+            });
+            const adminCount = Number(adminCountResult.rows[0]?.count ?? 0);
+            if (adminCount <= 1) {
+                await tx.rollback();
+                return { success: false, error: "No se puede eliminar al último administrador de la asociación." };
+            }
+        }
+        
+        // Delete all memberships for this user in this club
+        await tx.execute({
+            sql: `DELETE FROM user_clubs_membership WHERE user_id = ? AND club_id = ?`,
+            args: [userIdToDelete, clubId]
+        });
+
+        // Also delete any shift requests from this user for this club
+        await tx.execute({
+            sql: `DELETE FROM shift_requests WHERE user_id = ? AND club_id = ?`,
+            args: [userIdToDelete, clubId]
+        });
+        
+        // And assignments
+        await tx.execute({
+            sql: `DELETE FROM match_assignments WHERE assigned_referee_id = ? AND club_id = ?`,
+            args: [userIdToDelete, clubId]
+        });
+        
+        await tx.commit();
+        return { success: true };
+    } catch (e: any) {
+        await tx.rollback();
+        console.error(`Error deleting member:`, e.message);
+        return { success: false, error: "No se pudo eliminar al miembro. Ocurrió un error en la base de datos." };
     }
 }
