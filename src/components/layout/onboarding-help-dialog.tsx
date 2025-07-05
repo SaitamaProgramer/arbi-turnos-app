@@ -1,5 +1,4 @@
-
-"use client";
+'use client';
 
 import {
   Dialog,
@@ -7,43 +6,37 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
 import { HelpCircle, User, Shield } from "lucide-react";
-import { cn } from "@/lib/utils";
 
-export function HelpDialog({ children, isMobile }: { children?: React.ReactNode, isMobile?: boolean }) {
+interface OnboardingHelpDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  defaultTab: 'admin' | 'referee';
+}
+
+export function OnboardingHelpDialog({ isOpen, onClose, defaultTab }: OnboardingHelpDialogProps) {
+
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      onClose();
+    }
+  };
+
   return (
-    <Dialog>
-      <DialogTrigger asChild>
-        {isMobile ? (
-          <Button variant="ghost" className="w-full justify-start text-base font-medium p-2 h-auto">
-            <HelpCircle size={18} className="mr-2" />
-            Ayuda
-          </Button>
-        ) : (
-          <div className={cn("relative hidden md:inline-block")}>
-            <Button variant="ghost" size="sm" className="text-foreground hover:text-primary">
-              <HelpCircle size={18} className="mr-1 sm:mr-2" />
-              <span className="hidden sm:inline">Ayuda</span>
-            </Button>
-            {children}
-          </div>
-        )}
-      </DialogTrigger>
+    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-[625px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <HelpCircle className="text-primary"/> 
-            Cómo Usar ArbiTurnos
+            ¡Bienvenido a ArbiTurnos!
           </DialogTitle>
           <DialogDescription>
-            Guía rápida para administradores de asociaciones y árbitros.
+            Aquí tienes una guía rápida para empezar. Puedes volver a verla desde el botón "Ayuda" en el menú.
           </DialogDescription>
         </DialogHeader>
-        <Tabs defaultValue="referee" className="w-full">
+        <Tabs defaultValue={defaultTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="referee"><User className="mr-2 h-4 w-4"/>Para Árbitros</TabsTrigger>
             <TabsTrigger value="admin"><Shield className="mr-2 h-4 w-4"/>Para Administradores</TabsTrigger>

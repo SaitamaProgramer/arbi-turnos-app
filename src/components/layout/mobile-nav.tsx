@@ -80,11 +80,7 @@ export function MobileNav({ currentUser }: MobileNavProps) {
                     </>
                     )}
                     <div onClick={(e) => e.stopPropagation()}>
-                        <HelpDialog>
-                            <Button variant="ghost" className="w-full justify-start text-base font-medium p-2 h-auto">
-                                <HelpCircle size={18} className="mr-2" /> Ayuda
-                            </Button>
-                        </HelpDialog>
+                        <HelpDialog isMobile />
                     </div>
                 </div>
                 {currentUser && (

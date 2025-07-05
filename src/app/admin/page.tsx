@@ -62,7 +62,7 @@ export default async function AdminPage() {
 
     return (
         <Tabs defaultValue="dashboard" className="w-full">
-            <TabsList className="h-auto justify-start flex-wrap">
+            <TabsList className="h-auto flex-wrap justify-center sm:justify-start">
                 {tabs.map(tab => (
                     <TabsTrigger key={tab.value} value={tab.value}>
                         <tab.icon className="mr-2 h-4 w-4"/>

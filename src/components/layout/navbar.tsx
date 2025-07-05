@@ -1,4 +1,3 @@
-
 'use client';
 
 import Link from 'next/link';
@@ -8,8 +7,8 @@ import { Button } from '@/components/ui/button';
 import { logout } from '@/lib/actions';
 import { HelpDialog } from './help-dialog';
 import { MobileNav } from './mobile-nav';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { useState, useEffect } from 'react';
+import { OnboardingHelpDialog } from './onboarding-help-dialog';
 
 function LogoutButton() {
   return (
@@ -23,28 +22,30 @@ function LogoutButton() {
 }
 
 export default function Navbar({ currentUser }: { currentUser: User | null }) {
-  const [showWelcome, setShowWelcome] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const isLoggedIn = !!currentUser;
 
   useEffect(() => {
-    const isNew = localStorage.getItem('isNewUser');
-    if (isNew === 'true') {
-      const timer = setTimeout(() => setShowWelcome(true), 500);
-      return () => clearTimeout(timer);
+    // We only want to run this on the client, and only when a user is logged in.
+    if (isLoggedIn && typeof window !== 'undefined') {
+      const isNew = localStorage.getItem('isNewUser');
+      if (isNew === 'true') {
+        // Use a small timeout to ensure the UI is mounted and ready.
+        // This helps prevent modals from appearing before the page is fully interactive.
+        const timer = setTimeout(() => setShowOnboarding(true), 500);
+        return () => clearTimeout(timer);
+      }
     }
-  }, []);
+  }, [isLoggedIn]); // Depend on the boolean flag to avoid object reference issues.
 
-  const handleWelcomeClose = () => {
-    if (showWelcome) {
-      setShowWelcome(false);
-      localStorage.removeItem('isNewUser');
+  const handleOnboardingClose = () => {
+    if (showOnboarding) {
+      setShowOnboarding(false);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('isNewUser');
+      }
     }
   };
-  
-  const handleOpenChange = (open: boolean) => {
-      if (!open) {
-          handleWelcomeClose();
-      }
-  }
 
   return (
     <header className="bg-card shadow-md sticky top-0 z-50">
@@ -69,34 +70,7 @@ export default function Navbar({ currentUser }: { currentUser: User | null }) {
             </Link>
           )}
           
-            <Popover open={showWelcome} onOpenChange={handleOpenChange}>
-                <PopoverTrigger asChild>
-                    {/* The HelpDialog now acts as the trigger */}
-                    <HelpDialog>
-                        {/* We add the indicator here, relative to the button */}
-                        {showWelcome && (
-                            <span className="absolute top-0 right-0 -mt-1 -mr-1 flex h-3 w-3">
-                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                                <span className="relative inline-flex rounded-full h-3 w-3 bg-primary"></span>
-                            </span>
-                        )}
-                    </HelpDialog>
-                </PopoverTrigger>
-                <PopoverContent side="bottom" align="end" className="w-80 z-[101]" onClick={(e) => e.stopPropagation()}>
-                    <div className="flex justify-between items-start gap-2">
-                        <div className="space-y-2">
-                            <h4 className="font-medium leading-none text-lg">¡Bienvenido a ArbiTurnos!</h4>
-                            <p className="text-sm text-muted-foreground">
-                            ¿Es tu primera vez por aquí? Lee nuestra guía rápida para empezar.
-                            </p>
-                        </div>
-                        <Button variant="ghost" size="icon" className="h-6 w-6 flex-shrink-0 -mt-1 -mr-2" onClick={handleWelcomeClose}>
-                            <X size={16}/>
-                            <span className="sr-only">Cerrar</span>
-                        </Button>
-                    </div>
-                </PopoverContent>
-            </Popover>
+          <HelpDialog />
 
           {currentUser ? (
             <>
@@ -123,6 +97,13 @@ export default function Navbar({ currentUser }: { currentUser: User | null }) {
 
         <MobileNav currentUser={currentUser} />
       </nav>
+      {showOnboarding && currentUser && (
+        <OnboardingHelpDialog
+          isOpen={showOnboarding}
+          onClose={handleOnboardingClose}
+          defaultTab={currentUser.isAdmin ? 'admin' : 'referee'}
+        />
+      )}
     </header>
   );
 }
