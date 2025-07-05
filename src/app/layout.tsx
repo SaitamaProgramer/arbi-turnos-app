@@ -6,6 +6,7 @@ import Navbar from '@/components/layout/navbar';
 import { Analytics } from '@vercel/analytics/react';
 import { SpeedInsights } from '@vercel/speed-insights/next';
 import Footer from '@/components/layout/footer';
+import { getUserFromSession } from '@/lib/session';
 
 // General metadata for the app
 export const metadata: Metadata = {
@@ -24,11 +25,12 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const currentUser = await getUserFromSession();
   return (
     <html lang="es">
       <head>
@@ -38,7 +40,7 @@ export default function RootLayout({
         <link href="https://fonts.googleapis.com/css2?family=PT+Sans:ital,wght@0,400;0,700;1,400;1,700&display=swap" rel="stylesheet" crossOrigin="anonymous" />
       </head>
       <body className="font-body antialiased min-h-screen flex flex-col bg-background">
-        <Navbar />
+        <Navbar currentUser={currentUser} />
         <main className="flex-grow container mx-auto px-4 py-8">
           {children}
         </main>

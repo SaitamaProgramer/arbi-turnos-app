@@ -91,6 +91,7 @@ export default async function AdminPage() {
                      <ClubMatchManager 
                         clubId={club.id}
                         initialMatches={definedMatches || []}
+                        initialMatchAssignments={matchAssignments || []}
                     />
                 </TabsContent>
                 <TabsContent value="members" className="mt-0">

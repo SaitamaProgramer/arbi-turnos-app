@@ -53,6 +53,7 @@ export default function LoginPage() {
           variant: "destructive",
         });
       } else if (result?.success && result.redirectUrl) {
+        localStorage.setItem('isNewUser', 'true');
         toast({
           title: "¡Inicio de sesión exitoso!",
           variant: "success",

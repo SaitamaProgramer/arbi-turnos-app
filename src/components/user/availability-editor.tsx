@@ -141,7 +141,7 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
       <div className="text-center py-6">
         <AlertTriangle className="mx-auto h-10 w-10 text-yellow-500 mb-3" />
         <p className="text-lg font-semibold text-muted-foreground mb-1">
-          No hay Partidos disponibles para <span className="text-primary font-bold">{clubName}</span>
+          No hay Partidos Disponibles para <span className="text-primary font-bold">{clubName}</span>
         </p>
         <p className="text-xs text-muted-foreground">
           El administrador de la asociación no ha definido partidos futuros programados.
@@ -178,32 +178,34 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
                   </FormLabel>
                 </div>
                 <div className="space-y-3 max-h-72 overflow-y-auto pr-2">
-                  {postulationMode === 'individual' && matchesForForm.map((match) => (
-                    <FormField
-                      key={match.id}
-                      control={form.control}
-                      name="selectedMatchIds"
-                      render={({ field: individualField }) => {
-                        const isChecked = individualField.value?.includes(match.id);
-                        const isThisMatchActuallyEditableByDate = !nonEditableByDateMatchIds.has(match.id);
-                        const assignment = assignments.find(asg => asg.matchId === match.id);
-                        const isThisMatchAssignedToCurrentUser = !!assignment;
-                        
-                        const canBeSelected = match.status === 'scheduled' && isThisMatchActuallyEditableByDate && !isThisMatchAssignedToCurrentUser;
-                        const disableCheckbox = isPending || !canEdit || (!isChecked && !canBeSelected);
-                        
-                        return (
-                          <FormItem
-                            key={match.id}
-                            className={cn("flex flex-row items-start space-x-3 space-y-0 p-3 bg-muted/30 rounded-md border",
-                              (disableCheckbox && !isChecked) && "opacity-70 cursor-not-allowed",
-                              isThisMatchAssignedToCurrentUser && "border-green-500",
-                              match.status === 'cancelled' && "border-destructive/50",
-                              match.status === 'postponed' && "border-yellow-500/50",
-                            )}
-                          >
-                            <FormControl>
+                  {postulationMode === 'individual' && matchesForForm.map((match) => {
+                    const checkboxId = `match-checkbox-${match.id}`;
+                    return (
+                      <FormField
+                        key={match.id}
+                        control={form.control}
+                        name="selectedMatchIds"
+                        render={({ field: individualField }) => {
+                          const isChecked = individualField.value?.includes(match.id);
+                          const isThisMatchActuallyEditableByDate = !nonEditableByDateMatchIds.has(match.id);
+                          const assignment = assignments.find(asg => asg.matchId === match.id);
+                          const isThisMatchAssignedToCurrentUser = !!assignment;
+                          
+                          const canBeSelected = match.status === 'scheduled' && isThisMatchActuallyEditableByDate && !isThisMatchAssignedToCurrentUser;
+                          const disableCheckbox = isPending || !canEdit || (!isChecked && !canBeSelected);
+                          
+                          return (
+                            <div
+                              key={match.id}
+                              className={cn("flex flex-row items-start space-x-3 space-y-0 p-3 bg-muted/30 rounded-md border",
+                                (disableCheckbox && !isChecked) && "opacity-70 cursor-not-allowed",
+                                isThisMatchAssignedToCurrentUser && "border-green-500",
+                                match.status === 'cancelled' && "border-destructive/50",
+                                match.status === 'postponed' && "border-yellow-500/50",
+                              )}
+                            >
                               <Checkbox
+                                id={checkboxId}
                                 checked={isChecked}
                                 onCheckedChange={(checked) => {
                                   if (disableCheckbox) return;
@@ -213,26 +215,27 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
                                 }}
                                 disabled={disableCheckbox}
                               />
-                            </FormControl>
-                            <div className="flex-1">
-                               <FormLabel className={cn("font-normal text-sm flex items-center gap-2", (disableCheckbox && !isChecked) && "text-muted-foreground/70")}>
-                                {match.description}
-                                {isThisMatchAssignedToCurrentUser && <Badge variant="default" className="bg-green-500 hover:bg-green-500 text-white text-[10px] px-1.5 py-0.5"><BadgeCheck size={12} className="mr-1"/>Asignado: {assignment.assignmentRole === 'referee' ? 'Árbitro' : 'Asistente'}</Badge>}
-                                {match.status === 'cancelled' && <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5"><Ban size={12} className="mr-1"/>Cancelado</Badge>}
-                                {match.status === 'postponed' && <Badge variant="outline" className="text-yellow-600 border-yellow-500 text-[10px] px-1.5 py-0.5"><Clock size={12} className="mr-1"/>Pospuesto</Badge>}
-                              </FormLabel>
-                              <p className={cn("text-xs text-muted-foreground", (disableCheckbox && !isChecked) && "text-muted-foreground/50")}>
-                                {format(parseISO(match.date), "dd/MM/yy", { locale: es })} - {match.time} hs. en {match.location}
-                                {!isThisMatchActuallyEditableByDate && !isThisMatchAssignedToCurrentUser && <span className="text-red-500 text-xs italic ml-1">(Plazo vencido)</span>}
-                              </p>
+                              <div className="flex-1">
+                                 <label htmlFor={checkboxId} className={cn("font-normal text-sm flex items-center gap-2 cursor-pointer", (disableCheckbox && !isChecked) && "text-muted-foreground/70 cursor-not-allowed")}>
+                                  {match.description}
+                                  {isThisMatchAssignedToCurrentUser && <Badge variant="default" className="bg-green-500 hover:bg-green-500 text-white text-[10px] px-1.5 py-0.5"><BadgeCheck size={12} className="mr-1"/>Asignado: {assignment.assignmentRole === 'referee' ? 'Árbitro' : 'Asistente'}</Badge>}
+                                  {match.status === 'cancelled' && <Badge variant="destructive" className="text-[10px] px-1.5 py-0.5"><Ban size={12} className="mr-1"/>Cancelado</Badge>}
+                                  {match.status === 'postponed' && <Badge variant="outline" className="text-yellow-600 border-yellow-500 text-[10px] px-1.5 py-0.5"><Clock size={12} className="mr-1"/>Pospuesto</Badge>}
+                                </label>
+                                <p className={cn("text-xs text-muted-foreground", (disableCheckbox && !isChecked) && "text-muted-foreground/50")}>
+                                  {format(parseISO(match.date), "dd/MM/yy", { locale: es })} - {match.time} hs. en {match.location}
+                                  {!isThisMatchActuallyEditableByDate && !isThisMatchAssignedToCurrentUser && <span className="text-red-500 text-xs italic ml-1">(Plazo vencido)</span>}
+                                </p>
+                              </div>
                             </div>
-                          </FormItem>
-                        );
-                      }}
-                    />
-                  ))}
+                          );
+                        }}
+                      />
+                    );
+                  })}
                   
                   {postulationMode === 'by_day' && Object.entries(groupedMatches).map(([dateKey, matchesInDay]) => {
+                      const dayId = `day-checkbox-${dateKey.replace(/[^a-zA-Z0-9]/g, '-')}`;
                       const allMatchIdsInDay = matchesInDay.map(m => m.id);
                       const selectedIdsInForm = getValues("selectedMatchIds") || [];
                       
@@ -251,6 +254,7 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
                         <div key={dateKey} className={cn("p-3 bg-muted/30 rounded-md border", disableDayCheckbox && "opacity-70")}>
                           <div className="flex flex-row items-center space-x-3 space-y-0">
                             <Checkbox
+                              id={dayId}
                               checked={isDaySelected}
                               disabled={disableDayCheckbox}
                               onCheckedChange={(checked) => {
@@ -264,7 +268,7 @@ export default function AvailabilityEditor({ clubId, clubName, matches, assignme
                                 }
                               }}
                             />
-                            <FormLabel className={cn("font-semibold text-sm capitalize", disableDayCheckbox && "cursor-not-allowed")}>{dateKey}</FormLabel>
+                            <label htmlFor={dayId} className={cn("font-semibold text-sm capitalize cursor-pointer", disableDayCheckbox && "cursor-not-allowed")}>{dateKey}</label>
                           </div>
                           <ul className="mt-2 pl-8 space-y-1 text-xs text-muted-foreground list-disc list-inside">
                             {matchesInDay.map(match => (
