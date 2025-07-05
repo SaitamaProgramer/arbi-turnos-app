@@ -263,7 +263,7 @@ export default function ShiftTable({
                           <p className="font-semibold">{detail.user.name}</p>
                           <div className="flex items-center gap-2 text-muted-foreground">
                             <span><CarIcon size={12} className="inline mr-1"/> Auto: {detail.hasCar ? 'Sí' : 'No'}</span>
-                            {detail.notes && <p className="italic">| Notas: {detail.notes}</p>}
+                            {detail.notes && <p className="italic text-sm">| Notas: {detail.notes}</p>}
                           </div>
                         </div>
                       ))}
@@ -336,7 +336,7 @@ export default function ShiftTable({
                                 <Badge variant="default" className="bg-green-100 text-green-700 px-1.5 py-0.5 text-[10px]">Sí</Badge> : 
                                 <Badge variant="default" className="bg-red-100 text-red-700 px-1.5 py-0.5 text-[10px]">No</Badge>}
                             </div>
-                            {detail.notes && <p className="text-muted-foreground italic mt-0.5 text-[11px]">Notas: {detail.notes}</p>}
+                            {detail.notes && <p className="text-muted-foreground italic mt-0.5 text-sm">Notas: {detail.notes}</p>}
                           </li>
                         ))}
                       </ul>

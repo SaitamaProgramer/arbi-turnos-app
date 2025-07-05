@@ -78,7 +78,7 @@ export default function PostulationSummary({ clubName, postulation, assignments,
             {postulation.notes && (
             <div>
                 <h3 className="text-lg font-semibold mb-1 flex items-center gap-2"><ClipboardList className="text-primary" />Notas Adicionales:</h3>
-                <p className="text-muted-foreground whitespace-pre-wrap">{postulation.notes}</p>
+                <p className="text-muted-foreground whitespace-pre-wrap text-sm">{postulation.notes}</p>
             </div>
             )}
 

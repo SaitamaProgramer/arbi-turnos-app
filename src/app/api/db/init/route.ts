@@ -26,7 +26,10 @@ const schemaCreationCommands = [
   `CREATE TABLE IF NOT EXISTS clubs (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    postulation_mode TEXT NOT NULL DEFAULT 'individual' CHECK(postulation_mode IN ('individual', 'by_day'))
+    postulation_mode TEXT NOT NULL DEFAULT 'individual' CHECK(postulation_mode IN ('individual', 'by_day')),
+    subscription_tier TEXT NOT NULL DEFAULT 'free' CHECK(subscription_tier IN ('free', 'premium')),
+    stripe_customer_id TEXT,
+    subscription_expires_at TEXT
   );`,
   `CREATE TABLE IF NOT EXISTS user_clubs_membership (
     user_id TEXT NOT NULL,
