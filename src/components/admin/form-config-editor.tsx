@@ -17,13 +17,14 @@ import {
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Calendar } from "@/components/ui/calendar";
+import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
 import { saveClubDefinedMatches } from "@/lib/actions";
-import type { ClubSpecificMatch } from "@/types";
-import { useState, useTransition, useEffect } from "react";
-import { Save, ListPlus, Trash2, Loader2, CalendarPlusIcon, CalendarIcon, ClockIcon, MapPinIcon, InfoIcon } from "lucide-react";
+import type { ClubSpecificMatch, MatchAssignment } from "@/types";
+import { useState, useTransition, useEffect, useMemo } from "react";
+import { Save, ListPlus, Trash2, Loader2, CalendarPlusIcon, CalendarIcon, ClockIcon, MapPinIcon, InfoIcon, CopyPlus, CheckCircle, XCircle, Ban } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { format, parseISO, formatISO, isBefore, startOfDay } from "date-fns";
 import { es } from "date-fns/locale";
@@ -47,13 +48,27 @@ type ClubMatchesFormValues = z.infer<typeof clubMatchesFormSchema>;
 interface ClubMatchManagerProps {
   clubId: string;
   initialMatches: ClubSpecificMatch[];
+  initialMatchAssignments: MatchAssignment[];
 }
 
-export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchManagerProps) {
+export default function ClubMatchManager({ clubId, initialMatches, initialMatchAssignments }: ClubMatchManagerProps) {
   const { toast } = useToast();
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [pastMatchIds, setPastMatchIds] = useState(new Set<string>());
+
+  const assignmentsByMatchId = useMemo(() => {
+    const map = new Map<string, MatchAssignment[]>();
+    if (!Array.isArray(initialMatchAssignments)) return map;
+    
+    for (const assignment of initialMatchAssignments) {
+        if (!map.has(assignment.matchId)) {
+            map.set(assignment.matchId, []);
+        }
+        map.get(assignment.matchId)!.push(assignment);
+    }
+    return map;
+  }, [initialMatchAssignments]);
   
   const form = useForm<ClubMatchesFormValues>({
     resolver: zodResolver(clubMatchesFormSchema),
@@ -74,7 +89,6 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
     const today = startOfDay(new Date());
     const pastIds = new Set<string>();
     fields.forEach(match => {
-        // match.date is already a Date object from the form state
         if (isBefore(match.date, today)) {
             pastIds.add(match.id);
         }
@@ -122,6 +136,25 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
       status: "scheduled",
     }, { shouldFocus: true });
   };
+  
+  const reuseMatch = (index: number) => {
+    const matchToClone = form.getValues().matches[index];
+    if (!matchToClone) return;
+
+    append({
+        id: `match_${crypto.randomUUID().substring(0, 8)}`,
+        description: matchToClone.description,
+        location: matchToClone.location,
+        date: new Date(), // Reset to today
+        time: "12:00", // Reset to a default time
+        status: "scheduled", // Reset status
+    }, { shouldFocus: true });
+    
+    toast({
+        title: "Partido Reutilizado",
+        description: "Se ha creado un borrador. Por favor, ajusta la fecha y la hora."
+    });
+  };
 
 
   return (
@@ -133,7 +166,7 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
         </CardTitle>
         <CardDescription>
           Crea, edita o elimina los partidos. Puedes marcar un partido como cancelado o pospuesto. 
-          Los partidos pasados no se pueden editar.
+          Cualquier partido puede ser reutilizado para crear nuevos rápidamente.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -145,13 +178,40 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
                 const status = form.watch(`matches.${index}.status`);
                 const isCancelled = status === 'cancelled';
                 const isEditable = !isPast;
+
+                const renderPastMatchBadge = () => {
+                    if (!isPast) return null;
+                    
+                    if (status === 'cancelled') {
+                        return <Badge variant="destructive" className="font-normal text-xs"><Ban size={12} className="mr-1"/>Cancelado</Badge>;
+                    }
+                    
+                    const assignmentsForThisMatch = assignmentsByMatchId.get(field.id) || [];
+                    if (assignmentsForThisMatch.length > 0) {
+                        return <Badge variant="outline" className="border-green-600 text-green-600 font-normal text-xs"><CheckCircle size={12} className="mr-1"/>Finalizado</Badge>;
+                    } else {
+                        return <Badge variant="outline" className="border-muted-foreground text-muted-foreground font-normal text-xs"><XCircle size={12} className="mr-1"/>Expirado</Badge>;
+                    }
+                };
                 
                 return (
-                  <Card key={field.id} className={cn("p-4 space-y-3 bg-muted/30 relative", !isEditable && "opacity-70")}>
-                    {!isEditable && <div className="absolute inset-0 bg-transparent z-10" title="Este partido ya pasó y no se puede editar."></div>}
+                  <Card key={field.id} className={cn("p-4 space-y-3 bg-muted/30 relative", isPast && "opacity-70")}>
                     <div className="flex justify-between items-start mb-2 gap-2">
-                        <FormLabel className="text-lg font-semibold pt-1.5">Partido {index + 1}</FormLabel>
+                        <FormLabel className="text-lg font-semibold pt-1.5 flex items-center gap-2">
+                          Partido {index + 1}
+                          {isPast && renderPastMatchBadge()}
+                        </FormLabel>
                         <div className="flex items-center gap-2">
+                            <Button
+                                type="button"
+                                variant="secondary"
+                                size="sm"
+                                className="h-8"
+                                onClick={() => reuseMatch(index)}
+                            >
+                                <CopyPlus size={14} className="mr-1" />
+                                Reutilizar
+                            </Button>
                           <FormField
                             control={form.control}
                             name={`matches.${index}.status`}
@@ -183,7 +243,6 @@ export default function ClubMatchManager({ clubId, initialMatches }: ClubMatchMa
                               size="icon"
                               onClick={() => remove(index)}
                               aria-label="Eliminar partido"
-                              disabled={!isEditable}
                           >
                               <Trash2 size={18} />
                           </Button>

@@ -1,4 +1,5 @@
 
+
 export interface ClubSpecificMatch {
   id: string;
   clubId: string;
@@ -27,20 +28,24 @@ export interface ShiftRequestWithMatches extends ShiftRequest {
 export interface Club {
   id: string; 
   name: string;
+  postulationMode: 'individual' | 'by_day';
 }
 
 export interface User {
   id: string;
   name: string;
   email: string;
-  role: 'admin' | 'referee';
   administeredClubIds?: string[];
   memberClubIds?: string[]; 
   password?: string; // Should only be present when creating/checking, not on fetched user objects
   isDeveloper?: boolean; // Flag to identify the developer user
+  roleInClub?: 'admin' | 'referee'; // Role of the user within a specific club context
+  isAdmin?: boolean;
+  isReferee?: boolean;
 }
 
 export type RegisterUserPayload = Omit<User, 'id'> & {
+  role: 'admin' | 'referee'; // This is needed for the form, but not stored globally
   confirmPassword?: string;
   clubName?: string;
   clubIdToJoin?: string;
@@ -52,6 +57,7 @@ export interface MatchAssignment {
   clubId: string;
   matchId: string; 
   assignedRefereeId: string;
+  assignmentRole: 'referee' | 'assistant';
   assignedAt: string;
 }
 
@@ -63,8 +69,9 @@ export interface AvailabilityFormData {
       id: string;
       name: string;
       matches: ClubSpecificMatch[];
-      assignments: Omit<MatchAssignment, 'id' | 'clubId' | 'assignedAt'>[]; // Assignments for the current user in this club
+      assignments: MatchAssignment[]; // Assignments for the current user in this club
       postulation: ShiftRequestWithMatches | null; // Pending postulation for the current user in this club
+      postulationMode: 'individual' | 'by_day';
     }
   }
 }
@@ -77,9 +84,17 @@ export interface Suggestion {
   submittedAt: string;
 }
 
+export interface UserStatMatch {
+  description: string;
+  date: string;
+  clubName: string;
+}
+
 export interface UserStats {
   associationsCount: number;
   refereedMatchesCount: number;
   cancelledMatchesCount: number;
   postulationsCount: number;
+  refereedMatches: UserStatMatch[];
+  cancelledMatches: UserStatMatch[];
 }

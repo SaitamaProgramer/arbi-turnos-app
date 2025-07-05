@@ -12,7 +12,7 @@ import { es } from "date-fns/locale";
 interface PostulationSummaryProps {
   clubName: string;
   postulation: ShiftRequestWithMatches;
-  assignments: Omit<MatchAssignment, 'id' | 'clubId' | 'assignedAt'>[];
+  assignments: MatchAssignment[];
   canEdit: boolean;
   onEdit: () => void;
 }
@@ -35,7 +35,8 @@ export default function PostulationSummary({ clubName, postulation, assignments,
             {postulation.selectedMatches.length > 0 ? (
                 <ul className="space-y-3">
                 {postulation.selectedMatches.map(match => {
-                    const isAssignedToThisMatch = assignments.some(asg => asg.matchId === match.id);
+                    const assignment = assignments.find(asg => asg.matchId === match.id);
+                    const isAssignedToThisMatch = !!assignment;
                     return (
                     <li key={match.id} className="p-3 bg-muted/30 rounded-md border">
                         <div className="flex justify-between items-start">
@@ -49,7 +50,7 @@ export default function PostulationSummary({ clubName, postulation, assignments,
                         <div className="flex flex-col items-end gap-1 text-xs">
                           {isAssignedToThisMatch && (
                               <Badge variant="default" className="bg-green-500 hover:bg-green-500 text-white whitespace-nowrap">
-                              <BadgeCheck size={14} className="mr-1" /> Asignado
+                              <BadgeCheck size={14} className="mr-1" /> Asignado: {assignment.assignmentRole === 'referee' ? 'Árbitro' : 'Asistente'}
                               </Badge>
                           )}
                            {match.status === 'cancelled' && (
@@ -77,7 +78,7 @@ export default function PostulationSummary({ clubName, postulation, assignments,
             {postulation.notes && (
             <div>
                 <h3 className="text-lg font-semibold mb-1 flex items-center gap-2"><ClipboardList className="text-primary" />Notas Adicionales:</h3>
-                <p className="text-muted-foreground whitespace-pre-wrap">{postulation.notes}</p>
+                <p className="text-muted-foreground whitespace-pre-wrap text-sm">{postulation.notes}</p>
             </div>
             )}
 

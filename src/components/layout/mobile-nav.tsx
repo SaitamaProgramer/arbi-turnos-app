@@ -1,3 +1,4 @@
+
 "use client";
 
 import { useState } from "react";
@@ -31,7 +32,7 @@ export function MobileNav({ currentUser }: MobileNavProps) {
   const closeSheet = () => setIsOpen(false);
 
   return (
-    <div className="lg:hidden">
+    <div className="md:hidden">
         <Sheet open={isOpen} onOpenChange={setIsOpen}>
         <SheetTrigger asChild>
             <Button variant="ghost" size="icon">
@@ -56,12 +57,10 @@ export function MobileNav({ currentUser }: MobileNavProps) {
                 <div className="p-2 space-y-1">
                     {currentUser ? (
                     <>
-                        {currentUser.role !== 'admin' && (
                         <Link href="/" className="flex items-center text-base font-medium p-2 rounded-md hover:bg-accent" onClick={closeSheet}>
                             <CalendarCheck size={18} className="mr-2" /> Disponibilidad
                         </Link>
-                        )}
-                        {currentUser.role === 'admin' && (
+                        {currentUser.isAdmin && (
                         <Link href="/admin" className="flex items-center text-base font-medium p-2 rounded-md hover:bg-accent" onClick={closeSheet}>
                             <ShieldCheck size={18} className="mr-2" /> Administración
                         </Link>

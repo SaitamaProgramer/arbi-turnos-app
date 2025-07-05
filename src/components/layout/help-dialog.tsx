@@ -17,12 +17,14 @@ export function HelpDialog({ children }: { children?: React.ReactNode }) {
   return (
     <Dialog>
       <DialogTrigger asChild>
-        {children || (
+        <div className="relative">
           <Button variant="ghost" size="sm" className="text-foreground hover:text-primary">
             <HelpCircle size={18} className="mr-1 sm:mr-2" />
             <span className="hidden sm:inline">Ayuda</span>
           </Button>
-        )}
+          {/* The children (the indicator) will be placed inside this relative container */}
+          {children}
+        </div>
       </DialogTrigger>
       <DialogContent className="sm:max-w-[625px]">
         <DialogHeader>
@@ -41,80 +43,88 @@ export function HelpDialog({ children }: { children?: React.ReactNode }) {
           </TabsList>
           <TabsContent value="referee" className="mt-4 max-h-[60vh] overflow-y-auto pr-4">
             <div className="space-y-4 text-sm">
-                <h3 className="font-semibold text-lg">1. Registro</h3>
-                <p>Para empezar, necesitas una invitación de una asociación. Pídele al administrador de la asociación el <strong>"Código de Asociación"</strong>.</p>
+                <h3 className="font-semibold text-lg">1. Registro y Login</h3>
                 <ul className="list-disc pl-5 space-y-1">
-                    <li>En la página de registro, selecciona la opción <strong>"Árbitro"</strong>.</li>
-                    <li>Ingresa el "Código de Asociación" que te proporcionaron.</li>
-                    <li>Completa tu nombre, email y crea una contraseña segura.</li>
+                    <li><strong>Registro:</strong> Para empezar, necesitas una invitación. Pídele al administrador de la asociación el <strong>"Código de Asociación"</strong>. En la página de registro, selecciona "Árbitro", ingresa el código y completa tus datos.</li>
+                    <li><strong>Login:</strong> Una vez registrado, puedes acceder con tu email y contraseña desde la página de "Iniciar Sesión".</li>
                 </ul>
 
                 <h3 className="font-semibold text-lg">2. Postularte a Turnos</h3>
-                <p>Una vez que inicies sesión, irás a la página de "Disponibilidad".</p>
+                <p>La página principal es "Disponibilidad". Desde aquí gestionas todo.</p>
                 <ul className="list-disc pl-5 space-y-1">
-                    <li><strong>Si perteneces a varias asociaciones, usa el menú desplegable para seleccionar la correcta.</strong> La página se actualizará para mostrar los partidos de esa asociación.</li>
-                    <li>Verás una lista de todos los partidos o turnos disponibles definidos por el administrador. Solo aparecerán los partidos con estado "Programado".</li>
-                    <li>Marca las casillas de todos los partidos para los que deseas postularte.</li>
-                    <li>Indica si dispones de auto (esto ayuda al administrador con la logística).</li>
-                    <li>Puedes añadir notas opcionales si necesitas comunicar algo específico.</li>
-                    <li>Haz clic en <strong>"Enviar Postulación"</strong>.</li>
+                    <li><strong>Seleccionar Asociación:</strong> Si perteneces a varias asociaciones, usa el menú desplegable para elegir la correcta. La página mostrará los partidos de esa asociación.</li>
+                    <li><strong>Modos de Postulación:</strong> El administrador decide cómo te postulas. Puede ser <strong>"Individual"</strong> (marcas cada partido que te interese) o por <strong>"Lote"</strong> (marcas un día completo, ej. "todo el sábado", para postularte a todos sus partidos a la vez).</li>
+                    <li>Indica si dispones de auto y añade notas si es necesario.</li>
+                    <li>Haz clic en <strong>"Enviar Postulación"</strong> para guardar.</li>
                 </ul>
 
-                <h3 className="font-semibold text-lg">3. Unirte a más Asociaciones</h3>
-                <p>Si ya tienes una cuenta, puedes unirte a otras asociaciones fácilmente.</p>
-                <ul className="list-disc pl-5 space-y-1">
-                    <li>En la página de "Disponibilidad", verás una sección para unirte a una nueva asociación.</li>
-                    <li>Pídele el <strong>"Código de Asociación"</strong> al administrador de la nueva liga.</li>
-                    <li>Ingresa el código y haz clic en "Unirse". ¡Listo! La nueva asociación aparecerá en tu menú desplegable.</li>
-                </ul>
-
-                <h3 className="font-semibold text-lg">4. Consultar y Editar tu Postulación</h3>
+                <h3 className="font-semibold text-lg">3. Consultar y Editar tu Postulación</h3>
                  <ul className="list-disc pl-5 space-y-1">
-                    <li>Después de enviar, verás un resumen de tu postulación para la asociación seleccionada.</li>
-                    <li>Puedes volver a esta página para ver a qué partidos te has postulado y si ya te han asignado a alguno (insignia verde de "Asignado").</li>
-                    <li>También podrás ver si un partido fue "Cancelado" o "Pospuesto" por el administrador.</li>
-                    <li>Si necesitas cambiar tu disponibilidad, puedes hacer clic en <strong>"Editar Postulación"</strong>. Esto solo es posible si el partido no está demasiado cerca en la fecha o si aún no te lo han asignado.</li>
+                    <li>Después de enviar, verás un <strong>Resumen</strong> de tu postulación.</li>
+                    <li>En el resumen, podrás ver a qué partidos te han asignado con una insignia verde de <strong>"Asignado"</strong>.</li>
+                    <li>También verás si un partido fue <strong>"Cancelado"</strong> o <strong>"Pospuesto"</strong> por el administrador.</li>
+                    <li>Puedes hacer clic en <strong>"Editar Postulación"</strong>, pero solo si cumples dos condiciones: que falten <strong>más de 12 horas</strong> para el inicio del partido y que <strong>aún no te lo hayan asignado</strong>. Si no cumples alguna de estas, el botón estará desactivado.</li>
+                </ul>
+
+                <h3 className="font-semibold text-lg">4. Unirte a más Asociaciones</h3>
+                 <ul className="list-disc pl-5 space-y-1">
+                    <li>En la parte inferior de la página de "Disponibilidad", encontrarás un formulario.</li>
+                    <li>Pídele el nuevo <strong>"Código de Asociación"</strong> al administrador de la otra liga, ingrésalo y haz clic en "Unirse". ¡Listo! La nueva asociación aparecerá en tu menú desplegable.</li>
+                </ul>
+                
+                <h3 className="font-semibold text-lg">5. Gestionar tu Cuenta</h3>
+                 <ul className="list-disc pl-5 space-y-1">
+                    <li>En la sección <strong>"Mi Cuenta"</strong>, puedes cambiar tu contraseña.</li>
+                    <li>También encontrarás tus <strong>estadísticas personales</strong>, incluyendo un historial detallado de los partidos que has dirigido y los que fueron cancelados.</li>
                 </ul>
             </div>
           </TabsContent>
           <TabsContent value="admin" className="mt-4 max-h-[60vh] overflow-y-auto pr-4">
              <div className="space-y-4 text-sm">
-                <h3 className="font-semibold text-lg">1. Registro de tu Asociación</h3>
-                <p>Como administrador, tú creas la asociación desde cero.</p>
+                <h3 className="font-semibold text-lg">1. Registro y Login</h3>
                 <ul className="list-disc pl-5 space-y-1">
-                    <li>En la página de registro, selecciona la opción <strong>"Administrador de Asociación"</strong>.</li>
-                    <li>Ingresa el nombre que tendrá tu asociación o liga.</li>
-                    <li>Completa tu nombre, email y crea una contraseña segura.</li>
+                    <li><strong>Registro:</strong> En la página de registro, selecciona "Administrador de Asociación", elige un nombre para tu liga y completa tus datos.</li>
+                    <li><strong>Login:</strong> Accede con tu email y contraseña. Serás redirigido a tu panel de administración.</li>
                 </ul>
 
-                <h3 className="font-semibold text-lg">2. Gestionar tu Asociación (Panel de Admin)</h3>
-                <p>Al iniciar sesión, serás redirigido a tu panel de administración.</p>
+                <h3 className="font-semibold text-lg">2. Panel de Administración</h3>
+                <p>Tu panel se organiza en pestañas para facilitar la gestión.</p>
                 
-                <h4 className="font-medium text-md pl-2">Pestaña: Info de la Asociación</h4>
-                <ul className="list-disc pl-5 space-y-1">
-                    <li>Aquí encontrarás el <strong>"Código de la Asociación"</strong>. Este código es único y secreto.</li>
-                    <li>Cópialo y compártelo con los árbitros que quieras que se unan a tu asociación. Ellos lo necesitarán para registrarse.</li>
-                </ul>
-                
-                <h4 className="font-medium text-md pl-2">Pestaña: Definir Partidos/Turnos</h4>
-                <ul className="list-disc pl-5 space-y-1">
-                    <li>Aquí es donde creas y gestionas los "turnos" a los que los árbitros se postularán.</li>
-                    <li>Añade nuevos partidos especificando la descripción (ej: "Final Categoría 2010"), fecha, hora y lugar.</li>
-                    <li>Puedes cambiar el estado de un partido (a <strong>Cancelado</strong> o <strong>Pospuesto</strong>) usando el menú desplegable en cada tarjeta de partido.</li>
-                    <li>Para que los cambios se guarden, siempre debes hacer clic en el botón <strong>"Guardar Cambios en Partidos"</strong>.</li>
-                </ul>
-
-                 <h4 className="font-medium text-md pl-2">Pestaña: Gestionar Asignaciones</h4>
-                <ul className="list-disc pl-5 space-y-1">
-                    <li>Esta es la vista principal para organizar tus turnos.</li>
-                    <li>Verás cada partido que definiste y la lista de árbitros que se postularon.</li>
-                    <li>Verás insignias de estado claras (Finalizado, Cancelado, Pospuesto). Las acciones como asignar o quitar un árbitro se desactivarán automáticamente para los partidos que ya han finalizado o han sido cancelados.</li>
-                    <li>Haz clic en <strong>"Asignar Árbitro"</strong> en un partido, selecciona un árbitro de la lista de postulantes y confirma.</li>
-                </ul>
-
                 <h4 className="font-medium text-md pl-2">Pestaña: Dashboard</h4>
                 <ul className="list-disc pl-5 space-y-1">
-                    <li>Obtén un resumen rápido del estado de tu asociación: total de árbitros, cuántos han enviado postulaciones y quiénes faltan por hacerlo.</li>
+                    <li>Un resumen rápido: total de árbitros, cuántos han enviado postulaciones y quiénes faltan por hacerlo.</li>
+                </ul>
+                
+                <h4 className="font-medium text-md pl-2">Pestaña: Asignaciones</h4>
+                <ul className="list-disc pl-5 space-y-1">
+                    <li>La vista principal para organizar tus turnos. Verás cada partido con la lista de árbitros que se postularon.</li>
+                    <li>Asigna <strong>árbitros</strong> y <strong>asistentes</strong> haciendo clic en los botones de gestión correspondientes.</li>
+                    <li>Usa el botón <strong>"Publicar / Compartir"</strong> para generar una vista limpia de las asignaciones, ideal para descargar como imagen PNG o guardar como PDF.</li>
+                </ul>
+
+                 <h4 className="font-medium text-md pl-2">Pestaña: Definir Partidos</h4>
+                <ul className="list-disc pl-5 space-y-1">
+                    <li>Aquí creas y gestionas los turnos. Añade partidos con su descripción, fecha, hora y lugar.</li>
+                    <li>Usa el menú desplegable en cada partido para marcarlo como <strong>Cancelado</strong> o <strong>Pospuesto</strong>.</li>
+                    <li>Para agilizar la carga, usa el botón <strong>"Reutilizar"</strong> en cualquier partido para crear una copia que solo necesita una nueva fecha y hora.</li>
+                     <li><strong>Importante:</strong> Siempre haz clic en <strong>"Guardar Cambios en Partidos"</strong> para que tus modificaciones se apliquen.</li>
+                </ul>
+
+                <h4 className="font-medium text-md pl-2">Pestaña: Miembros</h4>
+                <ul className="list-disc pl-5 space-y-1">
+                    <li><strong>Promover a Admin:</strong> Dale permisos de administrador a un árbitro de confianza.</li>
+                    <li><strong>Revocar Admin:</strong> Convierte a un administrador de vuelta en árbitro. (No puedes hacerlo si es el último admin).</li>
+                    <li><strong>Eliminar Miembro:</strong> Quita a un usuario de tu asociación. Esta acción es irreversible y borrará sus datos relacionados (postulaciones, asignaciones).</li>
+                </ul>
+
+                 <h4 className="font-medium text-md pl-2">Pestaña: Configuración</h4>
+                <ul className="list-disc pl-5 space-y-1">
+                    <li>Aquí encontrarás el <strong>"Código de la Asociación"</strong> para compartir con nuevos árbitros.</li>
+                    <li>Puedes cambiar el <strong>Modo de Postulación</strong> entre "Individual" (un partido a la vez) y "Por Lote" (días completos).</li>
+                </ul>
+                 <h4 className="font-medium text-md pl-2">Pestaña: Sugerencias</h4>
+                <ul className="list-disc pl-5 space-y-1">
+                    <li>Si tu email coincide con el del desarrollador en la configuración, verás esta pestaña para leer las sugerencias de todos los usuarios.</li>
                 </ul>
             </div>
           </TabsContent>

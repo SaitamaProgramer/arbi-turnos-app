@@ -91,6 +91,7 @@ export default function RegisterPage() {
           variant: "destructive",
         });
       } else if (result?.success && result.redirectUrl) {
+        localStorage.setItem('isNewUser', 'true');
         toast({
           title: "¡Registro exitoso!",
           description: "Serás redirigido en breve.",
