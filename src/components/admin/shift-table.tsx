@@ -336,7 +336,7 @@ export default function ShiftTable({
                                 <Badge variant="default" className="bg-green-100 text-green-700 px-1.5 py-0.5 text-[10px]">Sí</Badge> : 
                                 <Badge variant="default" className="bg-red-100 text-red-700 px-1.5 py-0.5 text-[10px]">No</Badge>}
                             </div>
-                            {detail.notes && <p className="text-muted-foreground italic mt-0.5 text-sm">Notas: {detail.notes}</p>}
+                            {detail.notes && <p className="text-muted-foreground italic mt-1 text-sm">Notas: {detail.notes}</p>}
                           </li>
                         ))}
                       </ul>

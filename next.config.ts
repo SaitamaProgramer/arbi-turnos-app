@@ -1,10 +1,14 @@
 /** @type {import('next').NextConfig} */
 
+const isDev = process.env.NODE_ENV === 'development';
+
 // Define a Content Security Policy (CSP) to enhance security.
 // This policy specifies which resources the browser is allowed to load.
+const scriptSrc = `'self' 'unsafe-inline' va.vercel-scripts.com${isDev ? " 'unsafe-eval'" : ""}`;
+
 const ContentSecurityPolicy = `
   default-src 'self';
-  script-src 'self' va.vercel-scripts.com;
+  script-src ${scriptSrc};
   style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
   img-src 'self' https://placehold.co;
   font-src 'self' https://fonts.gstatic.com;
