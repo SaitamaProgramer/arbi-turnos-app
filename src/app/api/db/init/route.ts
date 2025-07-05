@@ -2,20 +2,9 @@
 import { db } from '@/lib/db';
 import { NextResponse } from 'next/server';
 
-// Este array contiene los comandos para borrar las tablas. El orden es inverso a la creación.
-const schemaDestructionCommands = [
-  'DROP TABLE IF EXISTS match_assignments;',
-  'DROP TABLE IF EXISTS shift_request_matches;',
-  'DROP TABLE IF EXISTS suggestions;',
-  'DROP TABLE IF EXISTS shift_requests;',
-  'DROP TABLE IF EXISTS club_matches;',
-  'DROP TABLE IF EXISTS user_clubs_membership;',
-  'DROP TABLE IF EXISTS clubs;',
-  'DROP TABLE IF EXISTS users;',
-];
-
 // Este array contiene todos los comandos SQL necesarios para crear el esquema de la base de datos.
 // El orden es importante debido a las claves foráneas (foreign keys).
+// Usamos "CREATE TABLE IF NOT EXISTS" para que la operación sea segura y no destructiva.
 const schemaCreationCommands = [
   `CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
@@ -92,17 +81,13 @@ const schemaCreationCommands = [
 
 export async function GET() {
   try {
-    console.log('Reiniciando la base de datos... Enviando comandos de borrado en lote.');
-    await db.batch(schemaDestructionCommands, 'write');
-    
-    console.log('Creando nuevo esquema de base de datos... Enviando comandos de creación en lote.');
+    console.log('Verificando e inicializando el esquema de la base de datos...');
     await db.batch(schemaCreationCommands, 'write');
 
-    console.log('La base de datos se ha inicializado correctamente.');
-    return NextResponse.json({ message: 'La base de datos se ha reiniciado y actualizado correctamente.' });
+    console.log('El esquema de la base de datos se ha inicializado/verificado correctamente.');
+    return NextResponse.json({ message: 'El esquema de la base de datos se ha inicializado/verificado correctamente. No se borraron datos existentes.' });
   } catch (error) {
     console.error('Error durante la inicialización de la base de datos:', error);
-    // Asegurarse de que el error se capture y se devuelva en un formato JSON legible
     const errorMessage = error instanceof Error ? error.message : String(error);
     return NextResponse.json({ message: 'La inicialización de la base de datos ha fallado.', error: errorMessage }, { status: 500 });
   }
