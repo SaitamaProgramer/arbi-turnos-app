@@ -28,7 +28,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { setAssignmentsForRole } from "@/lib/actions"; 
 import { UserCheck, Users, CalendarCheck2, AlertTriangle, Loader2, CheckCircle, XCircle, Clock, Ban, UserPlus2, UserCog2, Share2, CarIcon } from "lucide-react";
-import { useState, useMemo, useTransition, useEffect } from "react";
+import { useState, useMemo, useTransition, useEffect, FC } from "react";
 import { useRouter } from "next/navigation";
 import { format, parseISO, isBefore, startOfDay } from 'date-fns';
 import { es } from "date-fns/locale";
@@ -77,6 +77,147 @@ const AssignedUsersList = ({ users, role }: { users: User[], role: 'Árbitro' | 
   </div>
 );
 
+const getMemberByIdFn = (members: User[]) => (userId: string) => members.find(u => u.id === userId);
+
+const renderStatusBadgesFn = (match: ClubSpecificMatch, assignmentsForMatch: MatchAssignment[], pastMatchIds: Set<string>) => {
+  const isPast = pastMatchIds.has(match.id);
+  if (isPast) {
+      if (match.status === 'cancelled') return <MatchStatusBadge status="cancelled" text="Cancelado" icon={<Ban className="mr-1 h-3 w-3"/>} className="border-destructive text-destructive" />;
+      if (assignmentsForMatch.length > 0) return <MatchStatusBadge status="played" text="Finalizado" icon={<CheckCircle className="mr-1 h-3 w-3"/>} className="border-green-600 text-green-600"/>;
+      return <MatchStatusBadge status="expired" text="Expirado" icon={<XCircle className="mr-1 h-3 w-3"/>} className="border-muted-foreground text-muted-foreground"/>;
+  }
+  if (match.status === 'cancelled') return <MatchStatusBadge status="cancelled" text="Cancelado" icon={<Ban className="mr-1 h-3 w-3"/>} className="border-destructive text-destructive" />;
+  if (match.status === 'postponed') return <MatchStatusBadge status="postponed" text="Pospuesto" icon={<Clock className="mr-1 h-3 w-3"/>} className="border-yellow-600 text-yellow-600"/>;
+  return null;
+};
+
+
+interface MatchRowProps {
+  match: ClubSpecificMatch;
+  postulatedRefereeDetails: PostulatedRefereeDetails[];
+  assignments: MatchAssignment[];
+  getMemberById: (userId: string) => User | undefined;
+  pastMatchIds: Set<string>;
+  openAssignDialog: (match: ClubSpecificMatch, role: 'referee' | 'assistant') => void;
+  isPending: boolean;
+}
+
+const MobileMatchCard: FC<MatchRowProps> = ({ match, postulatedRefereeDetails, assignments, getMemberById, pastMatchIds, openAssignDialog, isPending }) => {
+    const matchAssignments = assignments.filter(a => a.matchId === match.id);
+    const assignedReferees = matchAssignments.filter(a => a.assignmentRole === 'referee').map(a => getMemberById(a.assignedRefereeId)).filter(Boolean) as User[];
+    const assignedAssistants = matchAssignments.filter(a => a.assignmentRole === 'assistant').map(a => getMemberById(a.assignedRefereeId)).filter(Boolean) as User[];
+    const isActionsDisabled = pastMatchIds.has(match.id) || match.status === 'cancelled';
+    const isPostponed = match.status === 'postponed';
+
+    return (
+        <Card key={`mobile-${match.id}`} className={cn(isActionsDisabled && "bg-muted/40 opacity-80")}>
+          <CardHeader>
+            <div className="flex justify-between items-start gap-2">
+              <CardTitle className="text-base">{match.description}</CardTitle>
+              <div className="shrink-0">{renderStatusBadgesFn(match, matchAssignments, pastMatchIds)}</div>
+            </div>
+            <CardDescription className="text-xs">
+              {format(parseISO(match.date), "dd/MM/yyyy", { locale: es })} a las {match.time} hs. en {match.location}
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="text-sm space-y-4">
+            <div>
+              <h4 className="font-semibold text-xs uppercase text-muted-foreground mb-2">Postulados ({postulatedRefereeDetails.length})</h4>
+              {postulatedRefereeDetails.length > 0 ? (
+                <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
+                  {postulatedRefereeDetails.map(detail => (
+                    <div key={detail.user.id} className="text-xs border-b border-dashed pb-1.5 last:border-b-0">
+                      <p className="font-semibold">{detail.user.name}</p>
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <span><CarIcon size={12} className="inline mr-1"/> Auto: {detail.hasCar ? 'Sí' : 'No'}</span>
+                        {detail.notes && <p className="italic text-sm">| Notas: {detail.notes}</p>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : <p className="text-xs text-muted-foreground italic">Nadie se postuló para este partido.</p>}
+            </div>
+
+            <div className="space-y-2">
+              {assignedReferees.length > 0 && <AssignedUsersList users={assignedReferees} role="Árbitro" />}
+              {assignedAssistants.length > 0 && <AssignedUsersList users={assignedAssistants} role="Asistente" />}
+            </div>
+
+            {!isActionsDisabled && (
+              <div className="flex flex-col gap-2 pt-3 border-t border-dashed">
+                  <Button variant="default" size="sm" onClick={() => openAssignDialog(match, 'referee')} disabled={isPending || isPostponed}>
+                      <UserPlus2 className="mr-1 h-4 w-4" /> Gestionar Árbitros
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => openAssignDialog(match, 'assistant')} disabled={isPending || isPostponed}>
+                      <UserCog2 className="mr-1 h-4 w-4" /> Gestionar Asistentes
+                  </Button>
+              </div>
+            )}
+             {isPostponed && <p className="text-xs text-muted-foreground mt-1 italic">Las asignaciones se habilitarán cuando se programe una nueva fecha.</p>}
+          </CardContent>
+        </Card>
+      )
+}
+
+const DesktopMatchRow: FC<MatchRowProps> = ({ match, postulatedRefereeDetails, assignments, getMemberById, pastMatchIds, openAssignDialog, isPending }) => {
+    const matchAssignments = assignments.filter(a => a.matchId === match.id);
+    const assignedReferees = matchAssignments.filter(a => a.assignmentRole === 'referee').map(a => getMemberById(a.assignedRefereeId)).filter(Boolean) as User[];
+    const assignedAssistants = matchAssignments.filter(a => a.assignmentRole === 'assistant').map(a => getMemberById(a.assignedRefereeId)).filter(Boolean) as User[];
+    const isActionsDisabled = pastMatchIds.has(match.id) || match.status === 'cancelled';
+    const isPostponed = match.status === 'postponed';
+    
+    return (
+        <TableRow key={match.id} className={cn(isActionsDisabled && "bg-muted/40 opacity-70")}>
+          <TableCell className="font-medium align-top pt-3">
+            <p className="font-semibold">{match.description}</p>
+            <p className="text-xs text-muted-foreground">
+              {format(parseISO(match.date), "dd/MM/yyyy", { locale: es })} a las {match.time} hs.
+            </p>
+            <p className="text-xs text-muted-foreground">Lugar: {match.location}</p>
+          </TableCell>
+          <TableCell className="align-top pt-3">
+            {postulatedRefereeDetails.length > 0 ? (
+              <ul className="space-y-2 text-xs max-h-40 overflow-y-auto pr-2">
+                {postulatedRefereeDetails.map(detail => (
+                  <li key={detail.user.id} className="border-b border-dashed pb-1.5 last:border-b-0 last:pb-0">
+                    <p className="font-semibold text-sm">{detail.user.name} <span className="text-muted-foreground">({detail.user.email})</span></p>
+                    <div className="flex items-center text-xs mt-0.5">
+                      <span className="mr-1 font-medium">Auto:</span>
+                      {detail.hasCar ? 
+                        <Badge variant="default" className="bg-green-100 text-green-700 px-1.5 py-0.5 text-[10px]">Sí</Badge> : 
+                        <Badge variant="default" className="bg-red-100 text-red-700 px-1.5 py-0.5 text-[10px]">No</Badge>}
+                    </div>
+                    {detail.notes && <p className="text-muted-foreground italic mt-1 text-sm">Notas: {detail.notes}</p>}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="text-xs text-muted-foreground italic">Nadie se postuló para este partido/turno aún.</p>
+            )}
+          </TableCell>
+          <TableCell className="text-right align-top pt-3 space-y-2">
+            <div className="flex flex-col items-end gap-1.5">
+              {renderStatusBadgesFn(match, matchAssignments, pastMatchIds)}
+              <div className="space-y-2 text-left w-full">
+                {assignedReferees.length > 0 && <AssignedUsersList users={assignedReferees} role="Árbitro" />}
+                {assignedAssistants.length > 0 && <AssignedUsersList users={assignedAssistants} role="Asistente" />}
+              </div>
+            </div>
+            {!isActionsDisabled && (
+                <div className="flex flex-col items-end gap-1 pt-2 border-t border-dashed mt-2">
+                    <Button variant="default" size="sm" onClick={() => openAssignDialog(match, 'referee')} className="h-7 px-2 py-1 text-xs whitespace-nowrap" disabled={isPending || isPostponed}>
+                      <UserPlus2 className="mr-1 h-3 w-3" /> Gestionar Árbitros
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => openAssignDialog(match, 'assistant')} className="h-7 px-2 py-1 text-xs whitespace-nowrap" disabled={isPending || isPostponed}>
+                      <UserCog2 className="mr-1 h-3 w-3" /> Gestionar Asistentes
+                    </Button>
+                </div>
+            )}
+            {isPostponed && <p className="text-xs text-muted-foreground mt-1 italic text-right">Las asignaciones se habilitarán cuando se programe una nueva fecha.</p>}
+          </TableCell>
+        </TableRow>
+    )
+}
 
 export default function ShiftTable({ 
   clubId, 
@@ -98,6 +239,8 @@ export default function ShiftTable({
   
   const [pastMatchIds, setPastMatchIds] = useState(new Set<string>());
 
+  const getMemberById = useMemo(() => getMemberByIdFn(initialClubMembers || []), [initialClubMembers]);
+  
   useEffect(() => {
     const validMatches = Array.isArray(initialDefinedMatches) ? initialDefinedMatches : [];
     const sortedMatches = [...validMatches].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
@@ -116,7 +259,6 @@ export default function ShiftTable({
 
   }, [initialDefinedMatches, initialMatchAssignments]);
   
-  const getMemberById = (userId: string) => (Array.isArray(initialClubMembers) ? initialClubMembers : []).find(u => u.id === userId);
 
   const postulatedRefereesByMatchId = useMemo(() => {
     const map = new Map<string, PostulatedRefereeDetails[]>();
@@ -187,21 +329,17 @@ export default function ShiftTable({
       <div className="text-center py-8 text-muted-foreground">
         <AlertTriangle className="mx-auto h-10 w-10 text-yellow-500 mb-3" />
         <p className="font-semibold">No hay partidos definidos para esta asociación.</p>
-        <p className="text-sm">Por favor, ve a la pestaña "Definir Partidos/Turnos" para añadir algunos.</p>
+        <p className="text-sm">Por favor, ve a la pestaña "Definir Partidos" para añadir algunos.</p>
       </div>
     );
   }
 
-  const renderStatusBadges = (match: ClubSpecificMatch, assignmentsForMatch: MatchAssignment[]) => {
-      const isPast = pastMatchIds.has(match.id);
-      if (isPast) {
-          if (match.status === 'cancelled') return <MatchStatusBadge status="cancelled" text="Cancelado" icon={<Ban className="mr-1 h-3 w-3"/>} className="border-destructive text-destructive" />;
-          if (assignmentsForMatch.length > 0) return <MatchStatusBadge status="played" text="Finalizado" icon={<CheckCircle className="mr-1 h-3 w-3"/>} className="border-green-600 text-green-600"/>;
-          return <MatchStatusBadge status="expired" text="Expirado" icon={<XCircle className="mr-1 h-3 w-3"/>} className="border-muted-foreground text-muted-foreground"/>;
-      }
-      if (match.status === 'cancelled') return <MatchStatusBadge status="cancelled" text="Cancelado" icon={<Ban className="mr-1 h-3 w-3"/>} className="border-destructive text-destructive" />;
-      if (match.status === 'postponed') return <MatchStatusBadge status="postponed" text="Pospuesto" icon={<Clock className="mr-1 h-3 w-3"/>} className="border-yellow-600 text-yellow-600"/>;
-      return null;
+  const sharedProps = {
+    assignments,
+    getMemberById,
+    pastMatchIds,
+    openAssignDialog,
+    isPending,
   };
 
   return (
@@ -234,63 +372,14 @@ export default function ShiftTable({
 
       {/* Mobile View */}
       <div className="space-y-4 md:hidden">
-        {definedMatches.map(match => {
-          const postulatedRefereeDetails = postulatedRefereesByMatchId.get(match.id) || [];
-          const matchAssignments = assignments.filter(a => a.matchId === match.id);
-          const assignedReferees = matchAssignments.filter(a => a.assignmentRole === 'referee').map(a => getMemberById(a.assignedRefereeId)).filter(Boolean) as User[];
-          const assignedAssistants = matchAssignments.filter(a => a.assignmentRole === 'assistant').map(a => getMemberById(a.assignedRefereeId)).filter(Boolean) as User[];
-          const isActionsDisabled = pastMatchIds.has(match.id) || match.status === 'cancelled';
-          const isPostponed = match.status === 'postponed';
-
-          return (
-            <Card key={`mobile-${match.id}`} className={cn(isActionsDisabled && "bg-muted/40 opacity-80")}>
-              <CardHeader>
-                <div className="flex justify-between items-start gap-2">
-                  <CardTitle className="text-base">{match.description}</CardTitle>
-                  <div className="shrink-0">{renderStatusBadges(match, matchAssignments)}</div>
-                </div>
-                <CardDescription className="text-xs">
-                  {format(parseISO(match.date), "dd/MM/yyyy", { locale: es })} a las {match.time} hs. en {match.location}
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="text-sm space-y-4">
-                <div>
-                  <h4 className="font-semibold text-xs uppercase text-muted-foreground mb-2">Postulados ({postulatedRefereeDetails.length})</h4>
-                  {postulatedRefereeDetails.length > 0 ? (
-                    <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
-                      {postulatedRefereeDetails.map(detail => (
-                        <div key={detail.user.id} className="text-xs border-b border-dashed pb-1.5 last:border-b-0">
-                          <p className="font-semibold">{detail.user.name}</p>
-                          <div className="flex items-center gap-2 text-muted-foreground">
-                            <span><CarIcon size={12} className="inline mr-1"/> Auto: {detail.hasCar ? 'Sí' : 'No'}</span>
-                            {detail.notes && <p className="italic text-sm">| Notas: {detail.notes}</p>}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : <p className="text-xs text-muted-foreground italic">Nadie se postuló para este partido.</p>}
-                </div>
-
-                <div className="space-y-2">
-                  {assignedReferees.length > 0 && <AssignedUsersList users={assignedReferees} role="Árbitro" />}
-                  {assignedAssistants.length > 0 && <AssignedUsersList users={assignedAssistants} role="Asistente" />}
-                </div>
-
-                {!isActionsDisabled && (
-                  <div className="flex flex-col gap-2 pt-3 border-t border-dashed">
-                      <Button variant="default" size="sm" onClick={() => openAssignDialog(match, 'referee')} disabled={isPending || isPostponed}>
-                          <UserPlus2 className="mr-1 h-4 w-4" /> Gestionar Árbitros
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => openAssignDialog(match, 'assistant')} disabled={isPending || isPostponed}>
-                          <UserCog2 className="mr-1 h-4 w-4" /> Gestionar Asistentes
-                      </Button>
-                  </div>
-                )}
-                 {isPostponed && <p className="text-xs text-muted-foreground mt-1 italic">Las asignaciones se habilitarán cuando se programe una nueva fecha.</p>}
-              </CardContent>
-            </Card>
-          )
-        })}
+        {definedMatches.map(match => (
+           <MobileMatchCard 
+            key={match.id}
+            match={match}
+            postulatedRefereeDetails={postulatedRefereesByMatchId.get(match.id) || []}
+            {...sharedProps}
+           />
+        ))}
       </div>
 
       {/* Desktop View */}
@@ -307,134 +396,80 @@ export default function ShiftTable({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {definedMatches.map((match) => {
-              const postulatedRefereeDetails = postulatedRefereesByMatchId.get(match.id) || [];
-              const matchAssignments = assignments.filter(a => a.matchId === match.id);
-              const assignedReferees = matchAssignments.filter(a => a.assignmentRole === 'referee').map(a => getMemberById(a.assignedRefereeId)).filter(Boolean) as User[];
-              const assignedAssistants = matchAssignments.filter(a => a.assignmentRole === 'assistant').map(a => getMemberById(a.assignedRefereeId)).filter(Boolean) as User[];
-              const isActionsDisabled = pastMatchIds.has(match.id) || match.status === 'cancelled';
-              const isPostponed = match.status === 'postponed';
-
-              return (
-                <TableRow key={match.id} className={cn(isActionsDisabled && "bg-muted/40 opacity-70")}>
-                  <TableCell className="font-medium align-top pt-3">
-                    <p className="font-semibold">{match.description}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {format(parseISO(match.date), "dd/MM/yyyy", { locale: es })} a las {match.time} hs.
-                    </p>
-                    <p className="text-xs text-muted-foreground">Lugar: {match.location}</p>
-                  </TableCell>
-                  <TableCell className="align-top pt-3">
-                    {postulatedRefereeDetails.length > 0 ? (
-                      <ul className="space-y-2 text-xs max-h-40 overflow-y-auto pr-2">
-                        {postulatedRefereeDetails.map(detail => (
-                          <li key={detail.user.id} className="border-b border-dashed pb-1.5 last:border-b-0 last:pb-0">
-                            <p className="font-semibold text-sm">{detail.user.name} <span className="text-muted-foreground">({detail.user.email})</span></p>
-                            <div className="flex items-center text-xs mt-0.5">
-                              <span className="mr-1 font-medium">Auto:</span>
-                              {detail.hasCar ? 
-                                <Badge variant="default" className="bg-green-100 text-green-700 px-1.5 py-0.5 text-[10px]">Sí</Badge> : 
-                                <Badge variant="default" className="bg-red-100 text-red-700 px-1.5 py-0.5 text-[10px]">No</Badge>}
-                            </div>
-                            {detail.notes && <p className="text-muted-foreground italic mt-1 text-sm">Notas: {detail.notes}</p>}
-                          </li>
-                        ))}
-                      </ul>
-                    ) : (
-                      <p className="text-xs text-muted-foreground italic">Nadie se postuló para este partido/turno aún.</p>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right align-top pt-3 space-y-2">
-                    <div className="flex flex-col items-end gap-1.5">
-                      {renderStatusBadges(match, matchAssignments)}
-                      <div className="space-y-2 text-left w-full">
-                        {assignedReferees.length > 0 && <AssignedUsersList users={assignedReferees} role="Árbitro" />}
-                        {assignedAssistants.length > 0 && <AssignedUsersList users={assignedAssistants} role="Asistente" />}
-                      </div>
-                    </div>
-                    {!isActionsDisabled && (
-                        <div className="flex flex-col items-end gap-1 pt-2 border-t border-dashed mt-2">
-                            <Button variant="default" size="sm" onClick={() => openAssignDialog(match, 'referee')} className="h-7 px-2 py-1 text-xs whitespace-nowrap" disabled={isPending || isPostponed}>
-                              <UserPlus2 className="mr-1 h-3 w-3" /> Gestionar Árbitros
-                            </Button>
-                            <Button variant="outline" size="sm" onClick={() => openAssignDialog(match, 'assistant')} className="h-7 px-2 py-1 text-xs whitespace-nowrap" disabled={isPending || isPostponed}>
-                              <UserCog2 className="mr-1 h-3 w-3" /> Gestionar Asistentes
-                            </Button>
-                        </div>
-                    )}
-                    {isPostponed && <p className="text-xs text-muted-foreground mt-1 italic text-right">Las asignaciones se habilitarán cuando se programe una nueva fecha.</p>}
-                  </TableCell>
-                </TableRow>
-              );
-            })}
+            {definedMatches.map((match) => (
+                <DesktopMatchRow 
+                    key={match.id}
+                    match={match}
+                    postulatedRefereeDetails={postulatedRefereesByMatchId.get(match.id) || []}
+                    {...sharedProps}
+                />
+            ))}
           </TableBody>
         </Table>
       </div>
 
-      {assignDialogState.open && assignDialogState.matchToAssign && (
-        <Dialog open={assignDialogState.open} onOpenChange={(open) => {
-            if (!open) {
-                setAssignDialogState({ open: false, matchToAssign: null, role: 'referee' });
-                setSelectedUserIds([]);
-            }
-        }}>
-          <DialogContent className="sm:max-w-md">
-            {!assignDialogState.matchToAssign ? null : (
-              <>
-                <DialogHeader>
-                  <DialogTitle>
-                    Gestionar {assignDialogState.role === 'referee' ? 'Árbitros' : 'Asistentes'}
-                  </DialogTitle>
-                  <DialogDescription>
-                    Para: <span className="font-semibold">{assignDialogState.matchToAssign.description}</span>
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="py-2">
-                  <p className="text-sm font-medium mb-2">Selecciona los miembros postulados (máx. 6):</p>
-                  <div className="space-y-2 max-h-64 overflow-y-auto pr-2 border rounded-md p-3">
-                    {(postulatedRefereesByMatchId.get(assignDialogState.matchToAssign.id) || []).map(detail => {
-                      const isChecked = selectedUserIds.includes(detail.user.id);
-                      const isDisabled = !isChecked && selectedUserIds.length >= 6;
-                      
-                      return (
-                        <div key={detail.user.id} className={cn("flex items-center space-x-2", isDisabled && "opacity-50")}>
-                          <Checkbox
-                            id={`user-${detail.user.id}`}
-                            checked={isChecked}
-                            disabled={isDisabled}
-                            onCheckedChange={(checked) => {
-                              setSelectedUserIds(prev =>
-                                checked
-                                  ? [...prev, detail.user.id]
-                                  : prev.filter(id => id !== detail.user.id)
-                              );
-                            }}
-                          />
-                          <Label htmlFor={`user-${detail.user.id}`} className={cn("font-normal", isDisabled && "cursor-not-allowed")}>
-                            {detail.user.name}
-                          </Label>
-                        </div>
-                      )
-                    })}
-                    {(postulatedRefereesByMatchId.get(assignDialogState.matchToAssign.id) || []).length === 0 && (
-                      <p className="text-xs text-muted-foreground text-center py-4">No hay miembros postulados para este partido.</p>
-                    )}
-                  </div>
+      <Dialog open={assignDialogState.open} onOpenChange={(open) => {
+          if (!open) {
+              setAssignDialogState({ open: false, matchToAssign: null, role: 'referee' });
+              setSelectedUserIds([]);
+          }
+      }}>
+        <DialogContent className="sm:max-w-md">
+          {assignDialogState.matchToAssign && (
+            <div key={`${assignDialogState.matchToAssign.id}-${assignDialogState.role}`}>
+              <DialogHeader>
+                <DialogTitle>
+                  Gestionar {assignDialogState.role === 'referee' ? 'Árbitros' : 'Asistentes'}
+                </DialogTitle>
+                <DialogDescription>
+                  Para: <span className="font-semibold">{assignDialogState.matchToAssign.description}</span>
+                </DialogDescription>
+              </DialogHeader>
+              <div className="py-2">
+                <p className="text-sm font-medium mb-2">Selecciona los miembros postulados (máx. 6):</p>
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-2 border rounded-md p-3">
+                  {(postulatedRefereesByMatchId.get(assignDialogState.matchToAssign.id) || []).map(detail => {
+                    const isChecked = selectedUserIds.includes(detail.user.id);
+                    const isDisabled = !isChecked && selectedUserIds.length >= 6;
+                    
+                    return (
+                      <div key={detail.user.id} className={cn("flex items-center space-x-2", isDisabled && "opacity-50")}>
+                        <Checkbox
+                          id={`user-${detail.user.id}`}
+                          checked={isChecked}
+                          disabled={isDisabled}
+                          onCheckedChange={(checked) => {
+                            setSelectedUserIds(prev =>
+                              checked
+                                ? [...prev, detail.user.id]
+                                : prev.filter(id => id !== detail.user.id)
+                            );
+                          }}
+                        />
+                        <Label htmlFor={`user-${detail.user.id}`} className={cn("font-normal", isDisabled && "cursor-not-allowed")}>
+                          {detail.user.name}
+                        </Label>
+                      </div>
+                    )
+                  })}
+                  {(postulatedRefereesByMatchId.get(assignDialogState.matchToAssign.id) || []).length === 0 && (
+                    <p className="text-xs text-muted-foreground text-center py-4">No hay miembros postulados para este partido.</p>
+                  )}
                 </div>
-                <DialogFooter>
-                  <DialogClose asChild>
-                    <Button type="button" variant="secondary" disabled={isPending}>Cancelar</Button>
-                  </DialogClose>
-                  <Button onClick={handleAssignAction} className="bg-primary hover:bg-primary/90" disabled={isPending}>
-                    {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
-                    Confirmar Asignación
-                  </Button>
-                </DialogFooter>
-              </>
-            )}
-          </DialogContent>
-        </Dialog>
-      )}
+              </div>
+              <DialogFooter>
+                <DialogClose asChild>
+                  <Button type="button" variant="secondary" disabled={isPending}>Cancelar</Button>
+                </DialogClose>
+                <Button onClick={handleAssignAction} className="bg-primary hover:bg-primary/90" disabled={isPending}>
+                  {isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin"/>}
+                  Confirmar Asignación
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </>
   );
 }
